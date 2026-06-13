@@ -36,7 +36,7 @@ export function raycastVoxels(world, origin, dir, maxDist) {
   // en partant et on s'appuie sur la traversée.
   while (t <= maxDist) {
     if (isSolid(world.getBlock(x, y, z))) {
-      return { x, y, z, nx, ny, nz };
+      return { x, y, z, nx, ny, nz, dist: t };
     }
 
     // Avance vers la prochaine frontière, sur l'axe le plus proche.

@@ -7,6 +7,11 @@ export class InputManager {
     this.keys = new Set();        // codes des touches enfoncées
     this.locked = false;          // pointer lock actif ?
 
+    // Boutons souris maintenus (pour le minage continu / la pose répétée).
+    this.leftDown = false;
+    this.rightDown = false;
+    this.leftClicked = false; // front montant du clic gauche (attaque de mob)
+
     // Deltas souris accumulés depuis la dernière consommation.
     this.mouseDX = 0;
     this.mouseDY = 0;
@@ -30,8 +35,14 @@ export class InputManager {
     // Demande le verrouillage du pointeur au clic sur le canvas.
     canvas.addEventListener('mousedown', (e) => {
       if (!this.locked) return; // le clic qui (re)lock est géré par l'overlay
-      if (e.button === 0) this.clicks.push('break');
-      else if (e.button === 2) this.clicks.push('place');
+      if (e.button === 0) { this.leftDown = true; this.leftClicked = true; }
+      else if (e.button === 2) this.rightDown = true;
+    });
+
+    // Relâchements suivis au niveau du document (le pointeur est verrouillé).
+    document.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.leftDown = false;
+      else if (e.button === 2) this.rightDown = false;
     });
 
     // Empêche le menu contextuel sur clic droit.
@@ -39,6 +50,8 @@ export class InputManager {
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === canvas;
+      // À la perte du verrouillage (menu/inventaire), on arrête les actions.
+      if (!this.locked) { this.leftDown = false; this.rightDown = false; }
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -131,6 +144,12 @@ export class InputManager {
   consumeEscape() {
     const v = this.pendingEscape;
     this.pendingEscape = false;
+    return v;
+  }
+
+  consumeLeftClick() {
+    const v = this.leftClicked;
+    this.leftClicked = false;
     return v;
   }
 }

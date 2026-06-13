@@ -1,21 +1,20 @@
 import { PLAYER_HALF_WIDTH, PLAYER_HEIGHT } from '../core/constants.js';
 import { isSolid } from '../blocks/BlockRegistry.js';
 
-// Collision AABB joueur/voxels. La boîte du joueur a pour pieds `pos` (y = bas)
-// et monte de PLAYER_HEIGHT, avec une demi-largeur PLAYER_HALF_WIDTH en X/Z.
+// Collision AABB générique contre les voxels. Une entité est définie par ses
+// pieds `pos` (y = bas), une demi-largeur `hw` en X/Z et une hauteur `h`.
+// Utilisée par le joueur ET les mobs (tailles variables).
 
-const HW = PLAYER_HALF_WIDTH;
-const H = PLAYER_HEIGHT;
 const STEP = 0.05; // pas du déplacement balayé (5 cm) pour un contact « collé »
 
-// Y a-t-il un bloc solide qui chevauche la boîte du joueur à la position `pos` ?
-function collides(world, pos) {
-  const minX = Math.floor(pos.x - HW);
-  const maxX = Math.floor(pos.x + HW);
+// Un bloc solide chevauche-t-il la boîte (pos, hw, h) ?
+export function collidesBox(world, pos, hw, h) {
+  const minX = Math.floor(pos.x - hw);
+  const maxX = Math.floor(pos.x + hw);
   const minY = Math.floor(pos.y);
-  const maxY = Math.floor(pos.y + H);
-  const minZ = Math.floor(pos.z - HW);
-  const maxZ = Math.floor(pos.z + HW);
+  const maxY = Math.floor(pos.y + h);
+  const minZ = Math.floor(pos.z - hw);
+  const maxZ = Math.floor(pos.z + hw);
 
   for (let y = minY; y <= maxY; y++) {
     for (let z = minZ; z <= maxZ; z++) {
@@ -27,10 +26,8 @@ function collides(world, pos) {
   return false;
 }
 
-// Déplace `pos` le long d'un axe d'au plus `delta`, en s'arrêtant net au
-// contact (déplacement balayé par petits pas pour éviter le clipping et coller
-// le joueur à la surface). Retourne true si un mur a été touché.
-function sweep(world, pos, axis, delta) {
+// Déplace `pos` le long d'un axe d'au plus `delta`, en s'arrêtant au contact.
+function sweepBox(world, pos, axis, delta, hw, h) {
   if (delta === 0) return false;
   const dir = Math.sign(delta);
   let remaining = Math.abs(delta);
@@ -38,8 +35,8 @@ function sweep(world, pos, axis, delta) {
   while (remaining > 0) {
     const inc = Math.min(STEP, remaining) * dir;
     pos[axis] += inc;
-    if (collides(world, pos)) {
-      pos[axis] -= inc; // annule le dernier pas : on est au contact
+    if (collidesBox(world, pos, hw, h)) {
+      pos[axis] -= inc;
       return true;
     }
     remaining -= Math.abs(inc);
@@ -47,19 +44,27 @@ function sweep(world, pos, axis, delta) {
   return false;
 }
 
-// Applique le déplacement `vel * dt` avec résolution axe par axe (X, Z, puis Y).
-// Met à jour `vel` (mise à zéro sur les axes bloqués) et retourne onGround.
-export function moveWithCollisions(world, pos, vel, dt) {
-  sweep(world, pos, 'x', vel.x * dt);
-  sweep(world, pos, 'z', vel.z * dt);
+// Applique vel*dt avec résolution axe par axe (X, Z, puis Y).
+// Met `vel` à zéro sur les axes bloqués ; retourne onGround.
+export function moveBox(world, pos, vel, dt, hw, h) {
+  sweepBox(world, pos, 'x', vel.x * dt, hw, h);
+  sweepBox(world, pos, 'z', vel.z * dt, hw, h);
 
   let onGround = false;
-  const hitY = sweep(world, pos, 'y', vel.y * dt);
+  const hitY = sweepBox(world, pos, 'y', vel.y * dt, hw, h);
   if (hitY) {
-    if (vel.y < 0) onGround = true; // on est tombé sur un bloc
+    if (vel.y < 0) onGround = true;
     vel.y = 0;
   }
   return onGround;
 }
 
-export { collides };
+// --- Variantes joueur (dimensions par défaut) -----------------------------
+
+export function moveWithCollisions(world, pos, vel, dt) {
+  return moveBox(world, pos, vel, dt, PLAYER_HALF_WIDTH, PLAYER_HEIGHT);
+}
+
+export function collides(world, pos) {
+  return collidesBox(world, pos, PLAYER_HALF_WIDTH, PLAYER_HEIGHT);
+}

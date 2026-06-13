@@ -24,6 +24,24 @@
     #hud { position: fixed; top: 8px; left: 8px; z-index: 10; color: #fff; font-size: 13px;
       font-family: monospace; text-shadow: 1px 1px 0 #000; pointer-events: none; line-height: 1.5; }
 
+    /* Barre de vie (cœurs) */
+    #health { position: fixed; bottom: 74px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 2px; z-index: 10; pointer-events: none; }
+    #health .heart { font-size: 20px; line-height: 1; color: #e23b3b;
+      text-shadow: 1px 1px 0 #000, -1px 0 0 #5a0e0e; }
+    #health .heart.empty { color: #3a3a3a; text-shadow: 1px 1px 0 #000; }
+
+    /* Barre de progression de minage (sous le réticule) */
+    #mine-progress { position: fixed; top: calc(50% + 22px); left: 50%; transform: translateX(-50%);
+      width: 70px; height: 6px; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 3px; z-index: 10; pointer-events: none; display: none; overflow: hidden; }
+    #mine-progress > div { height: 100%; width: 0%; background: #e8e8e8; }
+
+    /* Voile rouge (dégâts) et bleu (sous l'eau) */
+    #damage-flash, #underwater { position: fixed; inset: 0; z-index: 15; pointer-events: none; }
+    #damage-flash { background: radial-gradient(circle, rgba(180,0,0,0) 45%, rgba(180,0,0,0.7) 100%); opacity: 0; }
+    #underwater { background: rgba(30,90,170,0.35); opacity: 0; transition: opacity 0.2s; }
+
     /* ---- Hotbar ---- */
     #hotbar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
       display: flex; gap: 4px; padding: 4px; background: rgba(0,0,0,0.35);
@@ -105,8 +123,13 @@
   <canvas id="app"></canvas>
 
   <div id="crosshair"></div>
+  <div id="mine-progress"><div></div></div>
   <div id="hud"></div>
+  <div id="health"></div>
   <div id="hotbar"></div>
+
+  <div id="damage-flash"></div>
+  <div id="underwater"></div>
 
   <!-- ===================== MENU PRINCIPAL ===================== -->
   <div id="menu" class="screen">

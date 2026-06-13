@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { EYE_HEIGHT } from '../core/constants.js';
-import { isSolid } from '../blocks/BlockRegistry.js';
+import { isSolid, isWater } from '../blocks/BlockRegistry.js';
 import { moveWithCollisions } from './Physics.js';
 
 const WALK_SPEED = 4.5;
@@ -27,11 +27,43 @@ export class Player {
 
     this.flying = false;
     this.onGround = false;
+    this.inWater = false;
     this.moving = false;            // intention de déplacement (pour les anims)
     this.cameraMode = 'first';      // 'first' | 'third'
     this.mouseSensitivity = BASE_SENS;
 
+    // Vie / dégâts de chute.
+    this.spawn = spawn.clone();
+    this.maxHealth = 20;
+    this.health = 20;
+    this.justDamaged = 0;           // quantité de dégâts subis cette frame (UI)
+
     this._prevFly = false;
+    this._airPeakY = spawn.y;       // point le plus haut atteint en l'air
+    this._wasAir = false;
+    this._regenTimer = 0;           // temps écoulé depuis le dernier dégât
+    this._regenAcc = 0;
+
+    this.syncCamera();
+  }
+
+  // Bloc à hauteur des pieds, pour détecter l'eau.
+  _feetBlock(world) {
+    return world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y + 0.2), Math.floor(this.position.z));
+  }
+
+  damage(amount) {
+    if (amount <= 0 || this.health <= 0) return;
+    this.health = Math.max(0, this.health - amount);
+    this.justDamaged += amount;
+    this._regenTimer = 0;
+  }
+
+  respawn() {
+    this.position.copy(this.spawn);
+    this.velocity.set(0, 0, 0);
+    this.health = this.maxHealth;
+    this._airPeakY = this.spawn.y;
     this.syncCamera();
   }
 
@@ -63,11 +95,36 @@ export class Player {
     this.moving = len > 0;
     if (len > 0) { mx /= len; mz /= len; }
 
+    this.inWater = isWater(this._feetBlock(world));
+
     if (this.flying) this.updateFlying(input, mx, mz);
+    else if (this.inWater) this.updateSwimming(input, mx, mz, dt);
     else this.updateWalking(input, mx, mz, dt);
 
     this.onGround = moveWithCollisions(world, this.position, this.velocity, dt);
+    this._updateFallAndRegen(dt);
     this.syncCamera(world);
+  }
+
+  // Dégâts de chute (selon la distance) + régénération lente.
+  _updateFallAndRegen(dt) {
+    if (!this.onGround) {
+      this._airPeakY = Math.max(this._airPeakY, this.position.y);
+    } else {
+      if (this._wasAir && !this.flying && !this.inWater) {
+        const fall = this._airPeakY - this.position.y;
+        if (fall > 3.5) this.damage(Math.floor(fall - 3.5));
+      }
+      this._airPeakY = this.position.y;
+    }
+    this._wasAir = !this.onGround;
+
+    // Régénération : 1 PV toutes les 1.5 s après 5 s sans dégât.
+    this._regenTimer += dt;
+    if (this._regenTimer > 5 && this.health > 0 && this.health < this.maxHealth) {
+      this._regenAcc += dt;
+      if (this._regenAcc >= 1.5) { this.health += 1; this._regenAcc = 0; }
+    }
   }
 
   handleLook(input) {
@@ -106,6 +163,17 @@ export class Player {
     if (input.isDown('Space')) vy += FLY_SPEED;
     if (input.isDown('ShiftLeft')) vy -= FLY_SPEED;
     this.velocity.y = vy;
+  }
+
+  // Nage : déplacement ralenti, flottabilité, montée avec Espace.
+  updateSwimming(input, mx, mz, dt) {
+    const speed = WALK_SPEED * 0.6;
+    this.velocity.x = mx * speed;
+    this.velocity.z = mz * speed;
+
+    this.velocity.y -= GRAVITY * 0.25 * dt; // coulage lent
+    if (this.velocity.y < -4) this.velocity.y = -4;
+    if (input.isDown('Space')) this.velocity.y = 4; // remonter
   }
 
   // Position des yeux (origine du raycast d'interaction).

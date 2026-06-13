@@ -20,6 +20,11 @@ export const TILE_NAMES = [
   'glass',      // 11
   'craft_top',  // 12
   'craft_side', // 13
+  'water',      // 14
+  'coal_ore',   // 15
+  'iron_ore',   // 16
+  'gold_ore',   // 17
+  'diamond_ore',// 18
 ];
 
 // Map nom -> index de couche, pratique pour le BlockRegistry.
@@ -198,7 +203,45 @@ export function drawTile(name, ctx) {
       break;
     }
 
+    case 'water':
+      // Bleu avec un léger moiré (la transparence est gérée par le material).
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          const w = Math.sin((x + y) * 0.7) * 10 + (noise(x, y, 18) - 0.5) * 12;
+          px(ctx, x, y, 40 + w, 90 + w, 200 + w);
+        }
+      }
+      break;
+
+    case 'coal_ore':
+      drawOre(ctx, [40, 40, 44], 19);
+      break;
+    case 'iron_ore':
+      drawOre(ctx, [200, 150, 110], 20);
+      break;
+    case 'gold_ore':
+      drawOre(ctx, [240, 210, 70], 21);
+      break;
+    case 'diamond_ore':
+      drawOre(ctx, [110, 220, 230], 22);
+      break;
+
     default:
       fillNoisy(ctx, [255, 0, 255], 0, 0); // magenta = tuile manquante
+  }
+}
+
+// Minerai : base de pierre avec des amas de pépites colorées.
+function drawOre(ctx, oreColor, seed) {
+  fillNoisy(ctx, [128, 128, 130], 16, 6); // pierre
+  for (let y = 0; y < TILE_SIZE; y++) {
+    for (let x = 0; x < TILE_SIZE; x++) {
+      // Amas regroupés via un bruit basse fréquence.
+      const cluster = noise(Math.floor(x / 3), Math.floor(y / 3), seed);
+      if (cluster > 0.62 && noise(x, y, seed + 1) > 0.35) {
+        const v = (noise(x, y, seed + 2) - 0.5) * 30;
+        px(ctx, x, y, oreColor[0] + v, oreColor[1] + v, oreColor[2] + v);
+      }
+    }
   }
 }

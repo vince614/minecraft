@@ -1,5 +1,7 @@
-import { createNoise2D } from 'simplex-noise';
+import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { CHUNK_SIZE, CHUNK_HEIGHT } from '../core/constants.js';
+import { WATER } from '../blocks/BlockRegistry.js';
+import { VillageGenerator } from './VillageGenerator.js';
 
 // Génération procédurale du terrain par bruit de simplex.
 //
@@ -41,6 +43,9 @@ export class TerrainGenerator {
     this.continent = createNoise2D(rng); // relief général
     this.detail = createNoise2D(rng);    // petites variations
     this.biome = createNoise2D(rng);     // sélection de biome
+    this.cave = createNoise3D(rng);      // grottes (cavités 3D)
+    this.ore = createNoise3D(rng);       // répartition des minerais
+    this.villages = new VillageGenerator(seed);
     this.seed = seed;
   }
 
@@ -63,6 +68,23 @@ export class TerrainGenerator {
     return 'plains';
   }
 
+  // Cavité ? Bruit 3D au-dessus d'un seuil = grotte creusée.
+  isCave(wx, y, wz) {
+    return this.cave(wx * 0.07, y * 0.09, wz * 0.07) > 0.62;
+  }
+
+  // Type de minerai (ou pierre) pour un bloc de pierre, selon profondeur.
+  // Les minerais rares n'apparaissent qu'en profondeur.
+  oreAt(wx, y, wz) {
+    const v = this.ore(wx * 0.16, y * 0.16, wz * 0.16); // -1..1, amas (veines)
+    if (v > 0.84) return 13;                  // charbon (toute profondeur, commun)
+    if (v > 0.9 && y < 50) return 14;         // fer (moins commun)
+    // Raretés profondes (testées en premier pour qu'elles l'emportent).
+    if (y < 16 && v < -0.84) return 16;       // diamant (très profond)
+    if (y < 28 && v < -0.9) return 15;        // or (profond, rare)
+    return 3;                                 // pierre
+  }
+
   // Remplit un chunk : terrain puis arbres.
   generate(chunk) {
     const baseX = chunk.cx * CHUNK_SIZE;
@@ -82,14 +104,23 @@ export class TerrainGenerator {
           if (y === 0) {
             id = 4; // bedrock
           } else if (y < h - 3) {
-            id = 3; // pierre
+            id = this.oreAt(wx, y, wz); // pierre ou minerai
           } else if (y < h) {
             id = desert ? 5 : 2; // sable ou terre
           } else {
             // Surface : sable en désert, sinon herbe (ou sable près de l'eau).
             id = desert ? 5 : h <= SEA_LEVEL ? 5 : 1;
           }
+
+          // Grottes : on creuse les cavités 3D (sauf socle et surface).
+          if (y >= 2 && y < h - 1 && this.isCave(wx, y, wz)) id = 0;
+
           chunk.set(lx, y, lz, id);
+        }
+
+        // Eau : remplit jusqu'au niveau de la mer si le sol est sous l'eau.
+        if (h < SEA_LEVEL) {
+          for (let y = h + 1; y <= SEA_LEVEL; y++) chunk.set(lx, y, lz, WATER);
         }
       }
     }
@@ -113,6 +144,9 @@ export class TerrainGenerator {
         this.placeTree(chunk, lx, h + 1, lz, wx, wz);
       }
     }
+
+    // 3) Villages : structures recoupant ce chunk (déterministe).
+    this.villages.apply(chunk, this);
   }
 
   // Petit arbre : tronc de 4-5 blocs + canopée sphérique de feuilles.

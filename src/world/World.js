@@ -17,11 +17,16 @@ const key = (cx, cz) => `${cx},${cz}`;
 // déchargement dynamiques autour du joueur. C'est aussi le point d'accès aux
 // blocs en coordonnées MONDE (utilisé par la physique et l'interaction).
 export class World {
-  constructor(scene, material, seed = 1337) {
+  constructor(scene, blockMaterial, waterMaterial, seed = 1337) {
     this.scene = scene;
-    this.material = material;
+    this.material = blockMaterial;
+    this.waterMaterial = waterMaterial;
     this.chunks = new Map(); // "cx,cz" -> Chunk
     this.generator = new TerrainGenerator(seed);
+
+    // Blocs modifiés par le joueur (clé "wx,wy,wz" -> id), pour la sauvegarde
+    // et pour réappliquer les changements lorsqu'un chunk est régénéré.
+    this.edits = new Map();
 
     // Files de travail, traitées avec un budget par frame.
     this.dirty = new Set();   // chunks à (re)mailler (clés)
@@ -64,6 +69,9 @@ export class World {
     const lx = wx - cx * CHUNK_SIZE;
     const lz = wz - cz * CHUNK_SIZE;
     chunk.set(lx, wy, lz, id);
+
+    // Mémorise la modification (sauvegarde / régénération).
+    this.edits.set(`${wx},${wy},${wz}`, id);
 
     this.markDirty(cx, cz);
     // Si le bloc touche un bord, le chunk voisin doit aussi recalculer ses
@@ -122,10 +130,14 @@ export class World {
       const dx = chunk.cx - pcx;
       const dz = chunk.cz - pcz;
       if (dx * dx + dz * dz <= R * R) continue;
-      // Décharge : retire le mesh de la scène et libère la géométrie.
+      // Décharge : retire les meshes de la scène et libère les géométries.
       if (chunk.mesh) {
         this.scene.remove(chunk.mesh);
         chunk.mesh.geometry.dispose();
+      }
+      if (chunk.waterMesh) {
+        this.scene.remove(chunk.waterMesh);
+        chunk.waterMesh.geometry.dispose();
       }
       this.chunks.delete(k);
       this.dirty.delete(k);
@@ -139,6 +151,7 @@ export class World {
       const chunk = this.getChunk(cx, cz);
       if (!chunk || chunk.generated) continue;
       this.generator.generate(chunk);
+      this.applyEdits(chunk);
       chunk.generated = true;
       chunk.dirty = true;
       this.dirty.add(key(cx, cz));
@@ -164,22 +177,44 @@ export class World {
     }
   }
 
-  // (Re)construit la géométrie d'un chunk et remplace son mesh dans la scène.
+  // Réapplique les modifications du joueur enregistrées pour ce chunk.
+  applyEdits(chunk) {
+    if (this.edits.size === 0) return;
+    const baseX = chunk.cx * CHUNK_SIZE;
+    const baseZ = chunk.cz * CHUNK_SIZE;
+    for (const [k, id] of this.edits) {
+      const c = k.indexOf(',');
+      const c2 = k.indexOf(',', c + 1);
+      const wx = +k.slice(0, c);
+      const wy = +k.slice(c + 1, c2);
+      const wz = +k.slice(c2 + 1);
+      if (wx >= baseX && wx < baseX + CHUNK_SIZE && wz >= baseZ && wz < baseZ + CHUNK_SIZE) {
+        chunk.set(wx - baseX, wy, wz - baseZ, id);
+      }
+    }
+  }
+
+  // (Re)construit les géométries (solide + eau) d'un chunk et remplace ses
+  // meshes dans la scène.
   remeshChunk(chunk) {
     const sample = this.makeSampler(chunk);
-    const geometry = buildChunkGeometry(chunk, sample);
+    const { solid, water } = buildChunkGeometry(chunk, sample);
 
-    if (chunk.mesh) {
-      this.scene.remove(chunk.mesh);
-      chunk.mesh.geometry.dispose();
-      chunk.mesh = null;
+    chunk.mesh = this._swapMesh(chunk.mesh, solid, this.material, chunk);
+    chunk.waterMesh = this._swapMesh(chunk.waterMesh, water, this.waterMaterial, chunk);
+  }
+
+  // Remplace un mesh par une nouvelle géométrie (ou le retire si null).
+  _swapMesh(oldMesh, geometry, material, chunk) {
+    if (oldMesh) {
+      this.scene.remove(oldMesh);
+      oldMesh.geometry.dispose();
     }
-    if (!geometry) return; // chunk vide / invisible
-
-    const mesh = new THREE.Mesh(geometry, this.material);
+    if (!geometry) return null;
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(chunk.cx * CHUNK_SIZE, 0, chunk.cz * CHUNK_SIZE);
-    chunk.mesh = mesh;
     this.scene.add(mesh);
+    return mesh;
   }
 
   // Crée une fonction d'échantillonnage des blocs en coordonnées LOCALES au

@@ -155,4 +155,16 @@ export class SoundManager {
   playUi() {
     this._tone(660, 0.05, { type: 'sine', gain: 0.12 });
   }
+
+  // Coup porté à un mob (impact sourd).
+  playHit() {
+    this._noise(0.12, { type: 'lowpass', freq: 500, gain: 0.4 });
+    this._tone(140, 0.1, { type: 'square', gain: 0.12, freqEnd: 80 });
+  }
+
+  // Mort d'un mob (descente rapide).
+  playMobDeath() {
+    this._tone(300, 0.25, { type: 'sawtooth', gain: 0.18, freqEnd: 90 });
+    this._noise(0.18, { type: 'lowpass', freq: 800, gain: 0.2 });
+  }
 }

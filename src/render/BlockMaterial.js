@@ -85,19 +85,63 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-export function createBlockMaterial() {
+// Fragment pour l'eau : translucide (pas de discard, alpha via uOpacity) et
+// rendu avec blending. On partage la même texture array et le même éclairage.
+const waterFragmentShader = /* glsl */ `
+  precision highp float;
+  precision highp sampler2DArray;
+
+  uniform sampler2DArray uTex;
+  uniform vec3 uLightDir;
+  uniform float uAmbient;
+  uniform float uOpacity;
+
+  in vec2 vUv;
+  in float vLayer;
+  in vec3 vNormal;
+
+  out vec4 fragColor;
+
+  void main() {
+    vec4 tex = texture(uTex, vec3(fract(vUv), vLayer));
+    vec3 n = normalize(vNormal);
+    float diff = max(dot(n, normalize(uLightDir)), 0.0);
+    float light = uAmbient + (1.0 - uAmbient) * diff;
+    fragColor = vec4(tex.rgb * light, uOpacity);
+  }
+`;
+
+// Crée la texture array partagée puis les deux materials (blocs opaques + eau).
+export function createMaterials() {
   const texture = buildTextureArray();
 
-  const material = new THREE.ShaderMaterial({
+  const lightDir = new THREE.Vector3(0.6, 1.0, 0.4).normalize();
+
+  const blockMaterial = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3,
     uniforms: {
       uTex: { value: texture },
-      uLightDir: { value: new THREE.Vector3(0.6, 1.0, 0.4).normalize() },
+      uLightDir: { value: lightDir.clone() },
       uAmbient: { value: 0.45 },
     },
     vertexShader,
     fragmentShader,
   });
 
-  return material;
+  const waterMaterial = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    uniforms: {
+      uTex: { value: texture },
+      uLightDir: { value: lightDir.clone() },
+      uAmbient: { value: 0.55 },
+      uOpacity: { value: 0.72 },
+    },
+    vertexShader,
+    fragmentShader: waterFragmentShader,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  return { blockMaterial, waterMaterial };
 }

@@ -29,13 +29,47 @@ export const BLOCKS = [
   B(9, 'Pavé', { tiles: { top: TILE.cobble, bottom: TILE.cobble, side: TILE.cobble }, color: '#78787a' }),
   B(10, 'Verre', { tiles: { top: TILE.glass, bottom: TILE.glass, side: TILE.glass }, color: '#c8e1eb', transparent: true }),
   B(11, 'Établi', { tiles: { top: TILE.craft_top, bottom: TILE.planks, side: TILE.craft_side }, color: '#9a6f3c', interactive: true }),
+  // Eau : non solide (on peut nager au travers) et transparente.
+  B(12, 'Eau', { tiles: { top: TILE.water, bottom: TILE.water, side: TILE.water }, color: '#2f6fd0', solid: false, transparent: true }),
+  // Minerais (dans la pierre) : opaques, plus durs à miner.
+  B(13, 'Charbon', { tiles: { top: TILE.coal_ore, bottom: TILE.coal_ore, side: TILE.coal_ore }, color: '#2c2c30', hardness: 1.4 }),
+  B(14, 'Fer', { tiles: { top: TILE.iron_ore, bottom: TILE.iron_ore, side: TILE.iron_ore }, color: '#c89878', hardness: 1.6 }),
+  B(15, 'Or', { tiles: { top: TILE.gold_ore, bottom: TILE.gold_ore, side: TILE.gold_ore }, color: '#e6cd46', hardness: 1.8 }),
+  B(16, 'Diamant', { tiles: { top: TILE.diamond_ore, bottom: TILE.diamond_ore, side: TILE.diamond_ore }, color: '#6edce6', hardness: 2.2 }),
 ];
+
+export const WATER = 12;
+export function isWater(id) {
+  return id === WATER;
+}
+
+// Dureté (secondes de minage). Par défaut selon une heuristique simple.
+const DEFAULT_HARDNESS = {
+  1: 0.5, 2: 0.5, 5: 0.5, 7: 0.3,   // herbe, terre, sable, feuilles
+  3: 1.2, 9: 1.2,                    // pierre, pavé
+  6: 0.7, 8: 0.7, 11: 0.7,          // bois, planches, établi
+  10: 0.3,                           // verre
+};
+export function hardnessOf(id) {
+  const b = BLOCKS[id];
+  if (!b) return 0.5;
+  if (b.hardness != null) return b.hardness;
+  return DEFAULT_HARDNESS[id] != null ? DEFAULT_HARDNESS[id] : 0.5;
+}
 
 // Objets non-plaçables (id >= 100) : ils existent dans l'inventaire et servent
 // au craft mais ne sont pas des blocs du monde. Ex : les bâtons.
 export const STICK = 100;
+export const LEATHER = 101;
+export const FEATHER = 102;
+export const MEAT = 103;
+export const ROTTEN = 104;
 export const ITEMS = {
   [STICK]: { id: STICK, name: 'Bâton', color: '#8a6233', placeable: false },
+  [LEATHER]: { id: LEATHER, name: 'Cuir', color: '#9a6b3f', placeable: false },
+  [FEATHER]: { id: FEATHER, name: 'Plume', color: '#eaeaea', placeable: false },
+  [MEAT]: { id: MEAT, name: 'Viande', color: '#d06a6a', placeable: false },
+  [ROTTEN]: { id: ROTTEN, name: 'Chair putréfiée', color: '#6a8a4a', placeable: false },
 };
 
 // Accès unifié bloc OU objet par id.
@@ -54,9 +88,10 @@ export function itemColor(id) {
   return it ? it.color : '#ff00ff';
 }
 
-// Un id peut-il être posé dans le monde ? (bloc solide, pas un objet pur)
+// Un id peut-il être posé dans le monde ? (bloc solide, pas un objet pur ni
+// un fluide non solide comme l'eau)
 export function isPlaceable(id) {
-  return id > AIR && id < 100;
+  return id > AIR && id < 100 && BLOCKS[id].solid !== false;
 }
 
 // Le bloc déclenche-t-il une interaction au clic droit (ex : établi) ?

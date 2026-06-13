@@ -12,7 +12,8 @@ export class Chunk {
     // 1 octet par voxel = id du bloc. Initialisé à 0 (air).
     this.voxels = new Uint8Array(CHUNK_VOLUME);
 
-    this.mesh = null;       // THREE.Mesh courant (ou null si vide)
+    this.mesh = null;       // THREE.Mesh solide courant (ou null si vide)
+    this.waterMesh = null;  // THREE.Mesh d'eau courant (ou null)
     this.dirty = true;      // doit être (re)maillé
     this.generated = false; // le terrain a-t-il été généré ?
     this.empty = true;      // true tant qu'aucun bloc solide n'a été posé
