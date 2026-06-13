@@ -18,6 +18,8 @@ export const TILE_NAMES = [
   'planks',     // 9
   'cobble',     // 10
   'glass',      // 11
+  'craft_top',  // 12
+  'craft_side', // 13
 ];
 
 // Map nom -> index de couche, pratique pour le BlockRegistry.
@@ -161,6 +163,40 @@ export function drawTile(name, ctx) {
         }
       }
       break;
+
+    case 'craft_top': {
+      // Dessus de l'établi : planches + grille de craft 3x3.
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          const v = (noise(x, y, 16) - 0.5) * 8;
+          px(ctx, x, y, 150 + v, 116 + v, 70 + v);
+        }
+      }
+      // Lignes de grille (cadre + croix interne).
+      for (let i = 0; i < TILE_SIZE; i++) {
+        px(ctx, i, 1, 80, 58, 32); px(ctx, i, 14, 80, 58, 32);
+        px(ctx, 1, i, 80, 58, 32); px(ctx, 14, i, 80, 58, 32);
+        px(ctx, i, 5, 96, 70, 40); px(ctx, i, 10, 96, 70, 40);
+        px(ctx, 5, i, 96, 70, 40); px(ctx, 10, i, 96, 70, 40);
+      }
+      break;
+    }
+
+    case 'craft_side': {
+      // Côté de l'établi : planches avec une silhouette d'outils sombre.
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          const plank = y % 4 === 0 ? -22 : 0;
+          const v = (noise(x, y, 17) - 0.5) * 8;
+          px(ctx, x, y, 150 + plank + v, 116 + plank + v, 70 + plank + v);
+        }
+      }
+      // Bande d'outils foncée en haut.
+      for (let x = 2; x < 14; x++) {
+        if (x % 3 !== 0) { px(ctx, x, 3, 70, 50, 30); px(ctx, x, 4, 60, 42, 26); }
+      }
+      break;
+    }
 
     default:
       fillNoisy(ctx, [255, 0, 255], 0, 0); // magenta = tuile manquante

@@ -26,6 +26,13 @@ export class World {
     // Files de travail, traitées avec un budget par frame.
     this.dirty = new Set();   // chunks à (re)mailler (clés)
     this.toGenerate = [];     // [{cx,cz}] à générer, triés par distance
+
+    // Distance de rendu modifiable via les options.
+    this.renderDistance = RENDER_DISTANCE;
+  }
+
+  setRenderDistance(r) {
+    this.renderDistance = r;
   }
 
   getChunk(cx, cz) {
@@ -86,7 +93,7 @@ export class World {
   }
 
   ensureChunksAround(pcx, pcz) {
-    const R = RENDER_DISTANCE;
+    const R = this.renderDistance;
     const pending = [];
     for (let dz = -R; dz <= R; dz++) {
       for (let dx = -R; dx <= R; dx++) {
@@ -110,7 +117,7 @@ export class World {
   }
 
   unloadFarChunks(pcx, pcz) {
-    const R = RENDER_DISTANCE + 1; // hystérésis pour éviter le yo-yo en bordure
+    const R = this.renderDistance + 1; // hystérésis pour éviter le yo-yo en bordure
     for (const [k, chunk] of this.chunks) {
       const dx = chunk.cx - pcx;
       const dz = chunk.cz - pcz;

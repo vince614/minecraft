@@ -16,6 +16,11 @@ export class InputManager {
     this.wheel = 0;     // somme des crans molette
     this.slotKey = null; // 1..9 si une touche chiffre a été pressée
 
+    // Événements ponctuels (front montant, ignorent l'auto-répétition clavier).
+    this.pendingInventory = false; // touche E
+    this.pendingCamera = false;    // touche F5
+    this.pendingEscape = false;    // touche Échap
+
     this._bind();
   }
 
@@ -43,11 +48,21 @@ export class InputManager {
     });
 
     window.addEventListener('keydown', (e) => {
+      // F5 déclenche le rechargement du navigateur : on l'empêche pour s'en
+      // servir comme bascule de caméra.
+      if (e.code === 'F5') e.preventDefault();
+
       this.keys.add(e.code);
       // Sélection de slot par chiffre.
       if (e.code.startsWith('Digit')) {
         const n = parseInt(e.code.slice(5), 10);
         if (n >= 1 && n <= 9) this.slotKey = n - 1;
+      }
+      // Événements ponctuels (on ignore l'auto-répétition).
+      if (!e.repeat) {
+        if (e.code === 'KeyE') this.pendingInventory = true;
+        if (e.code === 'F5') this.pendingCamera = true;
+        if (e.code === 'Escape') this.pendingEscape = true;
       }
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -59,7 +74,15 @@ export class InputManager {
   }
 
   requestLock() {
-    this.canvas.requestPointerLock();
+    // requestPointerLock peut échouer (geste utilisateur expiré, contexte non
+    // autorisé) en lançant une exception OU en rejetant une promesse selon le
+    // navigateur : on absorbe les deux pour ne pas polluer la console.
+    try {
+      const r = this.canvas.requestPointerLock();
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {
+      /* ignoré : l'utilisateur pourra recliquer le canvas */
+    }
   }
 
   isDown(code) {
@@ -91,5 +114,23 @@ export class InputManager {
     const s = this.slotKey;
     this.slotKey = null;
     return s;
+  }
+
+  consumeInventoryToggle() {
+    const v = this.pendingInventory;
+    this.pendingInventory = false;
+    return v;
+  }
+
+  consumeCameraToggle() {
+    const v = this.pendingCamera;
+    this.pendingCamera = false;
+    return v;
+  }
+
+  consumeEscape() {
+    const v = this.pendingEscape;
+    this.pendingEscape = false;
+    return v;
   }
 }

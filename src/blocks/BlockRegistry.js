@@ -28,7 +28,41 @@ export const BLOCKS = [
   B(8, 'Planches', { tiles: { top: TILE.planks, bottom: TILE.planks, side: TILE.planks }, color: '#a07c4a' }),
   B(9, 'Pavé', { tiles: { top: TILE.cobble, bottom: TILE.cobble, side: TILE.cobble }, color: '#78787a' }),
   B(10, 'Verre', { tiles: { top: TILE.glass, bottom: TILE.glass, side: TILE.glass }, color: '#c8e1eb', transparent: true }),
+  B(11, 'Établi', { tiles: { top: TILE.craft_top, bottom: TILE.planks, side: TILE.craft_side }, color: '#9a6f3c', interactive: true }),
 ];
+
+// Objets non-plaçables (id >= 100) : ils existent dans l'inventaire et servent
+// au craft mais ne sont pas des blocs du monde. Ex : les bâtons.
+export const STICK = 100;
+export const ITEMS = {
+  [STICK]: { id: STICK, name: 'Bâton', color: '#8a6233', placeable: false },
+};
+
+// Accès unifié bloc OU objet par id.
+export function getItem(id) {
+  if (id >= 100) return ITEMS[id];
+  return BLOCKS[id];
+}
+
+export function itemName(id) {
+  const it = getItem(id);
+  return it ? it.name : '?';
+}
+
+export function itemColor(id) {
+  const it = getItem(id);
+  return it ? it.color : '#ff00ff';
+}
+
+// Un id peut-il être posé dans le monde ? (bloc solide, pas un objet pur)
+export function isPlaceable(id) {
+  return id > AIR && id < 100;
+}
+
+// Le bloc déclenche-t-il une interaction au clic droit (ex : établi) ?
+export function isInteractive(id) {
+  return id > AIR && id < 100 && !!BLOCKS[id].interactive;
+}
 
 export function getBlock(id) {
   return BLOCKS[id];
@@ -53,5 +87,16 @@ export function tileFor(id, faceDir) {
   return BLOCKS[id].tiles[faceDir];
 }
 
-// Blocs proposés dans la hotbar (touches 1..9), dans l'ordre.
-export const HOTBAR_BLOCKS = [1, 2, 3, 5, 6, 7, 8, 9, 10];
+// Inventaire de départ : on garnit quelques slots pour pouvoir construire et
+// crafter immédiatement. Chaque entrée = { id, count } ou null (slot vide).
+export const STARTER_INVENTORY = [
+  { id: 6, count: 16 },   // Bois
+  { id: 8, count: 32 },   // Planches
+  { id: 3, count: 32 },   // Pierre
+  { id: 9, count: 16 },   // Pavé
+  { id: 5, count: 16 },   // Sable
+  { id: 10, count: 16 },  // Verre
+  { id: 11, count: 4 },   // Établi
+  { id: 1, count: 16 },   // Herbe
+  { id: 7, count: 16 },   // Feuilles
+];
