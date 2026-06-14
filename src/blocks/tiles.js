@@ -25,6 +25,13 @@ export const TILE_NAMES = [
   'iron_ore',   // 16
   'gold_ore',   // 17
   'diamond_ore',// 18
+  'tnt_side',   // 19
+  'tnt_top',    // 20
+  'tnt_bottom', // 21
+  'chest_top',  // 22
+  'chest_side', // 23
+  'ench_top',   // 24
+  'ench_side',  // 25
 ];
 
 // Map nom -> index de couche, pratique pour le BlockRegistry.
@@ -224,6 +231,72 @@ export function drawTile(name, ctx) {
       break;
     case 'diamond_ore':
       drawOre(ctx, [110, 220, 230], 22);
+      break;
+
+    case 'tnt_side':
+      // Rouge avec une bande claire « TNT » au milieu.
+      for (let y = 0; y < TILE_SIZE; y++) {
+        for (let x = 0; x < TILE_SIZE; x++) {
+          const band = y >= 6 && y <= 9;
+          if (band) px(ctx, x, y, 222, 210, 170);
+          else { const v = (noise(x, y, 30) - 0.5) * 20; px(ctx, x, y, 180 + v, 40 + v, 30 + v); }
+        }
+      }
+      // Lettres « TNT » sommaires (3 barres sombres).
+      for (const bx of [3, 7, 11]) for (let yy = 7; yy <= 8; yy++) px(ctx, bx, yy, 60, 30, 20);
+      break;
+
+    case 'tnt_top':
+      for (let y = 0; y < TILE_SIZE; y++) for (let x = 0; x < TILE_SIZE; x++) {
+        const v = (noise(x, y, 31) - 0.5) * 18; px(ctx, x, y, 190 + v, 50 + v, 40 + v);
+      }
+      // Mèche centrale.
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) px(ctx, 8 + i, 8 + j, 60, 50, 40);
+      break;
+
+    case 'tnt_bottom':
+      for (let y = 0; y < TILE_SIZE; y++) for (let x = 0; x < TILE_SIZE; x++) {
+        const v = (noise(x, y, 32) - 0.5) * 16; px(ctx, x, y, 120 + v, 30 + v, 24 + v);
+      }
+      break;
+
+    case 'chest_top':
+      // Bois avec un cadre et une charnière.
+      for (let y = 0; y < TILE_SIZE; y++) for (let x = 0; x < TILE_SIZE; x++) {
+        const v = (noise(x, y, 33) - 0.5) * 10; px(ctx, x, y, 150 + v, 110 + v, 60 + v);
+      }
+      for (let i = 1; i < 15; i++) { px(ctx, i, 1, 90, 60, 30); px(ctx, i, 14, 90, 60, 30); px(ctx, 1, i, 90, 60, 30); px(ctx, 14, i, 90, 60, 30); }
+      for (let x = 6; x <= 9; x++) px(ctx, x, 0, 70, 70, 74); // charnière
+      break;
+
+    case 'chest_side':
+      // Bois avec bandes + serrure métallique au centre.
+      for (let y = 0; y < TILE_SIZE; y++) for (let x = 0; x < TILE_SIZE; x++) {
+        const band = y === 2 || y === 13;
+        const v = (noise(x, y, 34) - 0.5) * 10;
+        if (band) px(ctx, x, y, 90, 60, 30);
+        else px(ctx, x, y, 150 + v, 110 + v, 60 + v);
+      }
+      // serrure
+      for (let y = 6; y <= 10; y++) for (let x = 7; x <= 8; x++) px(ctx, x, y, 80, 80, 86);
+      px(ctx, 7, 8, 40, 40, 44); px(ctx, 8, 8, 40, 40, 44);
+      break;
+
+    case 'ench_top':
+      // Pierre sombre avec un motif rune violet.
+      for (let y = 0; y < TILE_SIZE; y++) for (let x = 0; x < TILE_SIZE; x++) {
+        const v = (noise(x, y, 35) - 0.5) * 14; px(ctx, x, y, 45 + v, 42 + v, 55 + v);
+      }
+      for (const [rx, ry] of [[4, 4], [10, 4], [7, 7], [4, 10], [10, 10], [7, 11]]) px(ctx, rx, ry, 170, 90, 220);
+      break;
+
+    case 'ench_side':
+      for (let y = 0; y < TILE_SIZE; y++) for (let x = 0; x < TILE_SIZE; x++) {
+        const v = (noise(x, y, 36) - 0.5) * 14;
+        const top = y < 3;
+        px(ctx, x, y, (top ? 70 : 40) + v, (top ? 40 : 38) + v, (top ? 90 : 50) + v);
+      }
+      for (const [rx, ry] of [[5, 8], [10, 11], [8, 6]]) px(ctx, rx, ry, 160, 80, 210);
       break;
 
     default:

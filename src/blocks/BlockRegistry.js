@@ -36,7 +36,19 @@ export const BLOCKS = [
   B(14, 'Fer', { tiles: { top: TILE.iron_ore, bottom: TILE.iron_ore, side: TILE.iron_ore }, color: '#c89878', hardness: 1.6 }),
   B(15, 'Or', { tiles: { top: TILE.gold_ore, bottom: TILE.gold_ore, side: TILE.gold_ore }, color: '#e6cd46', hardness: 1.8 }),
   B(16, 'Diamant', { tiles: { top: TILE.diamond_ore, bottom: TILE.diamond_ore, side: TILE.diamond_ore }, color: '#6edce6', hardness: 2.2 }),
+  B(17, 'TNT', { tiles: { top: TILE.tnt_top, bottom: TILE.tnt_bottom, side: TILE.tnt_side }, color: '#c0392b', hardness: 0.2 }),
+  B(18, 'Coffre', { tiles: { top: TILE.chest_top, bottom: TILE.planks, side: TILE.chest_side }, color: '#8a5a2a', hardness: 0.7, container: true }),
+  B(19, "Table d'enchantement", { tiles: { top: TILE.ench_top, bottom: TILE.ench_side, side: TILE.ench_side }, color: '#5a3a7a', hardness: 1.5, enchant: true }),
 ];
+
+export const CHEST = 18;
+export const ENCH_TABLE = 19;
+export function isContainer(id) {
+  return id === CHEST;
+}
+export function isEnchantTable(id) {
+  return id === ENCH_TABLE;
+}
 
 export const WATER = 12;
 export function isWater(id) {
@@ -64,13 +76,68 @@ export const LEATHER = 101;
 export const FEATHER = 102;
 export const MEAT = 103;
 export const ROTTEN = 104;
+export const SWORD = 105;
+export const PICKAXE = 106;
+export const BOW = 107;
+export const ARROW = 108;
+export const POWDER = 110; // poudre à canon (drop de creeper)
+export const TNT = 17;
 export const ITEMS = {
   [STICK]: { id: STICK, name: 'Bâton', color: '#8a6233', placeable: false },
   [LEATHER]: { id: LEATHER, name: 'Cuir', color: '#9a6b3f', placeable: false },
   [FEATHER]: { id: FEATHER, name: 'Plume', color: '#eaeaea', placeable: false },
   [MEAT]: { id: MEAT, name: 'Viande', color: '#d06a6a', placeable: false },
   [ROTTEN]: { id: ROTTEN, name: 'Chair putréfiée', color: '#6a8a4a', placeable: false },
+  [SWORD]: { id: SWORD, name: 'Épée', color: '#cfd6dc', placeable: false },
+  [PICKAXE]: { id: PICKAXE, name: 'Pioche', color: '#b9c0c6', placeable: false },
+  [BOW]: { id: BOW, name: 'Arc', color: '#8a6233', placeable: false },
+  [ARROW]: { id: ARROW, name: 'Flèche', color: '#cbb88f', placeable: false },
+  [POWDER]: { id: POWDER, name: 'Poudre', color: '#9a9a9a', placeable: false },
 };
+
+// Nourriture : valeur de restauration de faim.
+export function isFood(id) {
+  return id === MEAT || id === ROTTEN;
+}
+export function foodValue(id) {
+  if (id === MEAT) return 6;
+  if (id === ROTTEN) return 3;
+  return 0;
+}
+
+// Effet des outils tenus en main.
+export function attackDamageOf(heldId) {
+  return heldId === SWORD ? 9 : 5;
+}
+export function miningMultiplier(heldId) {
+  return heldId === PICKAXE ? 3 : 1;
+}
+export function isBow(id) {
+  return id === BOW;
+}
+
+// Enchantements applicables : coût en diamants, niveau max, et outils concernés.
+export const ENCHANTS = [
+  { key: 'efficiency', name: 'Efficacité', cost: 2, tools: [PICKAXE], max: 3 },
+  { key: 'sharpness', name: 'Tranchant', cost: 3, tools: [SWORD], max: 3 },
+  { key: 'power', name: 'Puissance', cost: 3, tools: [BOW], max: 3 },
+  { key: 'unbreaking', name: 'Solidité', cost: 2, tools: [SWORD, PICKAXE, BOW], max: 3 },
+];
+
+export function enchantsFor(id) {
+  return ENCHANTS.filter((e) => e.tools.includes(id));
+}
+
+// Durabilité des outils (nombre d'utilisations avant la casse). 0 = pas d'usure.
+export function maxDurabilityOf(id) {
+  if (id === SWORD) return 60;
+  if (id === PICKAXE) return 80;
+  if (id === BOW) return 50;
+  return 0;
+}
+export function isTool(id) {
+  return maxDurabilityOf(id) > 0;
+}
 
 // Accès unifié bloc OU objet par id.
 export function getItem(id) {
@@ -125,13 +192,25 @@ export function tileFor(id, faceDir) {
 // Inventaire de départ : on garnit quelques slots pour pouvoir construire et
 // crafter immédiatement. Chaque entrée = { id, count } ou null (slot vide).
 export const STARTER_INVENTORY = [
+  // Hotbar (slots 0-8)
   { id: 6, count: 16 },   // Bois
   { id: 8, count: 32 },   // Planches
   { id: 3, count: 32 },   // Pierre
-  { id: 9, count: 16 },   // Pavé
-  { id: 5, count: 16 },   // Sable
-  { id: 10, count: 16 },  // Verre
+  { id: 17, count: 8 },   // TNT
+  { id: 105, count: 1 },  // Épée
+  { id: 107, count: 1 },  // Arc
+  { id: 108, count: 32 }, // Flèches
   { id: 11, count: 4 },   // Établi
-  { id: 1, count: 16 },   // Herbe
-  { id: 7, count: 16 },   // Feuilles
+  { id: 103, count: 8 },  // Viande
+  // Sac (slots 9+)
+  { id: 106, count: 1 },  // Pioche
+  { id: 9, count: 16 },   // Pavé
+  { id: 5, count: 32 },   // Sable
+  { id: 10, count: 16 },  // Verre
+  { id: 110, count: 8 },  // Poudre
+  { id: 102, count: 8 },  // Plume
+  { id: 100, count: 16 }, // Bâton
+  { id: 18, count: 4 },   // Coffre
+  { id: 19, count: 1 },   // Table d'enchantement
+  { id: 16, count: 12 },  // Diamant (pour enchanter)
 ];

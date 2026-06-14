@@ -80,11 +80,15 @@ export class DropManager {
       d.mesh.position.set(d.pos.x, d.pos.y + 0.15 + Math.sin(this._time * 3 + i) * 0.07, d.pos.z);
       d.mesh.rotation.y += dt * 1.5;
 
-      // Ramassage.
+      // Ramassage : cylindre autour du joueur (tolérant en hauteur).
       const dx = d.pos.x - player.position.x;
-      const dy = d.pos.y - (player.position.y + 0.9);
       const dz = d.pos.z - player.position.z;
-      if (d.age > PICKUP_DELAY && dx * dx + dy * dy + dz * dz < PICKUP_RADIUS * PICKUP_RADIUS) {
+      const vert = d.pos.y - player.position.y; // pieds du joueur
+      if (
+        d.age > PICKUP_DELAY &&
+        dx * dx + dz * dz < PICKUP_RADIUS * PICKUP_RADIUS &&
+        vert > -1.0 && vert < 2.4
+      ) {
         this.ctx.inventory.add(d.id, d.count);
         if (this.ctx.sound) this.ctx.sound.playUi();
         this._remove(i);

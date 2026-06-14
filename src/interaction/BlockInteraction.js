@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import { REACH, PLAYER_HALF_WIDTH, PLAYER_HEIGHT } from '../core/constants.js';
-import { AIR, isPlaceable, isInteractive, hardnessOf, getBlock } from '../blocks/BlockRegistry.js';
+import {
+  AIR, isPlaceable, isInteractive, hardnessOf,
+  attackDamageOf, miningMultiplier, isFood, isContainer, isEnchantTable,
+} from '../blocks/BlockRegistry.js';
 import { raycastVoxels } from './VoxelRaycaster.js';
 
 const BEDROCK = 4; // indestructible
+const TNT_ID = 17;
 
 // Ciblage, surlignage, et actions casser/poser. Le minage est PROGRESSIF :
 // maintenir le clic gauche accumule des dégâts selon la dureté du bloc ; en
@@ -37,9 +41,11 @@ export class BlockInteraction {
     this._breakCd = 0;
     this._placeCd = 0;
     this._prevRight = false;
+    this.mining = false; // true tant qu'on casse activement un bloc (anim)
   }
 
   update(dt, input) {
+    this.mining = false;
     const eye = this.player.getEyePosition(this._eye);
     const dir = this.player.getDirection(this._dir);
     this.target = raycastVoxels(this.world, eye, dir, REACH);
@@ -55,8 +61,19 @@ export class BlockInteraction {
       this._setProgress(0);
       this._mineKey = null;
       this._mineProgress = 0;
-      if (clicked) this.mobManager.attackMob(mobHit.mob);
-      this._prevRight = input.rightDown; // évite une ouverture/pose parasite
+      const sel = this.inventory.selectedId();
+      if (clicked) {
+        const stack = this.inventory.getSelected();
+        const sharp = (stack && stack.ench && stack.ench.sharpness) || 0;
+        this.mobManager.attackMob(mobHit.mob, attackDamageOf(sel) + sharp * 2);
+        if (this.inventory.damageSelectedTool() === 'broke' && this.hooks.onToolBroke) this.hooks.onToolBroke();
+      }
+      // Nourrir un animal (clic droit en tenant de la nourriture).
+      const rightEdge = input.rightDown && !this._prevRight;
+      if (rightEdge && isFood(sel) && this.mobManager.feed(mobHit.mob)) {
+        this.inventory.consumeSelected(1);
+      }
+      this._prevRight = input.rightDown;
       return;
     }
 
@@ -84,13 +101,14 @@ export class BlockInteraction {
       return;
     }
 
+    this.mining = true; // on frappe le bloc (anim de minage)
     const key = `${t.x},${t.y},${t.z}`;
     if (key !== this._mineKey) {
       this._mineKey = key;
       this._mineProgress = 0;
     }
 
-    if (this.player.flying) {
+    if (this.player.creative) {
       // Créatif : casse quasi instantanée, avec un petit délai entre blocs.
       this._breakCd -= dt;
       if (this._breakCd <= 0) {
@@ -102,9 +120,11 @@ export class BlockInteraction {
       return;
     }
 
-    // Survie : progression selon la dureté.
+    // Survie : progression selon la dureté (accélérée par pioche + Efficacité).
     this._mineProgress += dt;
-    const need = hardnessOf(id);
+    const stack = this.inventory.getSelected();
+    const eff = (stack && stack.ench && stack.ench.efficiency) || 0;
+    const need = hardnessOf(id) / (miningMultiplier(this.inventory.selectedId()) + eff);
     this._setProgress(Math.min(1, this._mineProgress / need));
     if (this._mineProgress >= need) {
       this._doBreak(id);
@@ -117,11 +137,20 @@ export class BlockInteraction {
     this._placeCd -= dt;
     const t = this.target;
     const rightEdge = input.rightDown && !this._prevRight;
+    const targetId = t ? this.world.getBlock(t.x, t.y, t.z) : AIR;
+    const sel = this.inventory.selectedId();
 
-    if (t && rightEdge && isInteractive(this.world.getBlock(t.x, t.y, t.z))) {
-      // Clic droit sur l'établi -> ouvre le craft 3x3.
-      if (this.hooks.onOpenCraft) this.hooks.onOpenCraft(3);
-    } else if (input.rightDown && this._placeCd <= 0) {
+    if (t && rightEdge && isInteractive(targetId)) {
+      if (this.hooks.onOpenCraft) this.hooks.onOpenCraft(3); // établi
+    } else if (t && rightEdge && isContainer(targetId)) {
+      if (this.hooks.onOpenChest) this.hooks.onOpenChest(t.x, t.y, t.z); // coffre
+    } else if (t && rightEdge && isEnchantTable(targetId)) {
+      if (this.hooks.onOpenEnchant) this.hooks.onOpenEnchant(); // table d'enchantement
+    } else if (t && rightEdge && targetId === TNT_ID) {
+      if (this.hooks.onIgnite) this.hooks.onIgnite(t.x, t.y, t.z); // amorce la TNT
+    } else if (rightEdge && sel >= 100) {
+      if (this.hooks.onUseItem) this.hooks.onUseItem(sel); // arc, nourriture…
+    } else if (isPlaceable(sel) && input.rightDown && this._placeCd <= 0) {
       if (this._doPlace()) this._placeCd = 0.22;
     }
     this._prevRight = input.rightDown;
@@ -133,10 +162,19 @@ export class BlockInteraction {
 
   _doBreak(id) {
     const { x, y, z } = this.target;
+    // Un coffre cassé lâche tout son contenu.
+    if (isContainer(id)) {
+      const slots = this.world.removeChest(x, y, z);
+      if (this.hooks.onChestBroken) this.hooks.onChestBroken(slots, x, y, z);
+    }
     this.world.setBlock(x, y, z, AIR);
     // L'objet n'est plus ajouté directement : il tombe au sol (géré par le
     // hook onBreak via le DropManager).
     if (this.hooks.onBreak) this.hooks.onBreak(id, x, y, z);
+    // Usure de l'outil tenu (en survie).
+    if (!this.player.creative && this.inventory.damageSelectedTool() === 'broke' && this.hooks.onToolBroke) {
+      this.hooks.onToolBroke();
+    }
   }
 
   _doPlace() {
@@ -151,7 +189,7 @@ export class BlockInteraction {
     // On ne pose pas dans un bloc déjà solide.
     if (this.world.getBlock(px, py, pz) !== AIR && this.world.getBlock(px, py, pz) !== 12) return false;
 
-    if (!this.player.flying) {
+    if (!this.player.creative) {
       const stack = this.inventory.getSelected();
       if (!stack || stack.count <= 0) return false;
       this.inventory.consumeSelected(1);

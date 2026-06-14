@@ -1,4 +1,4 @@
-import { STARTER_INVENTORY } from '../blocks/BlockRegistry.js';
+import { STARTER_INVENTORY, isTool, maxDurabilityOf } from '../blocks/BlockRegistry.js';
 
 export const HOTBAR_SIZE = 9;
 export const INVENTORY_SIZE = 36; // 9 (hotbar) + 27 (sac)
@@ -12,9 +12,12 @@ export class Inventory {
     this.slots = new Array(INVENTORY_SIZE).fill(null);
     this.selected = 0;
 
-    // Garnissage initial.
+    // Garnissage initial (les outils reçoivent leur durabilité).
     STARTER_INVENTORY.forEach((entry, i) => {
-      if (entry && i < INVENTORY_SIZE) this.slots[i] = { id: entry.id, count: entry.count };
+      if (!entry || i >= INVENTORY_SIZE) return;
+      const s = { id: entry.id, count: entry.count };
+      if (isTool(entry.id)) { s.count = 1; s.dur = maxDurabilityOf(entry.id); }
+      this.slots[i] = s;
     });
 
     // Compteur de version : incrémenté à chaque changement pour que l'UI sache
@@ -38,6 +41,18 @@ export class Inventory {
   // Ajoute `count` objets `id`, en complétant d'abord les stacks existants puis
   // les slots vides. Retourne le reste non casé (0 si tout est rentré).
   add(id, count = 1) {
+    // Outils : non empilables, chacun dans son slot avec sa durabilité.
+    if (isTool(id)) {
+      for (let i = 0; i < this.slots.length && count > 0; i++) {
+        if (!this.slots[i]) {
+          this.slots[i] = { id, count: 1, dur: maxDurabilityOf(id) };
+          count--;
+        }
+      }
+      this.touch();
+      return count;
+    }
+
     // 1) compléter les stacks existants
     for (let i = 0; i < this.slots.length && count > 0; i++) {
       const s = this.slots[i];
@@ -68,6 +83,39 @@ export class Inventory {
     if (s.count <= 0) this.slots[this.selected] = null;
     this.touch();
     return true;
+  }
+
+  // Retire `count` objets `id` où qu'ils soient. Retourne le reste non retiré.
+  remove(id, count = 1) {
+    for (let i = 0; i < this.slots.length && count > 0; i++) {
+      const s = this.slots[i];
+      if (s && s.id === id) {
+        const n = Math.min(s.count, count);
+        s.count -= n;
+        count -= n;
+        if (s.count <= 0) this.slots[i] = null;
+      }
+    }
+    this.touch();
+    return count;
+  }
+
+  // Use l'outil sélectionné : réduit sa durabilité ; le retire s'il casse.
+  // Retourne 'broke', 'ok' ou null (pas d'outil sélectionné).
+  damageSelectedTool() {
+    const s = this.slots[this.selected];
+    if (!s || s.dur == null) return null;
+    // Enchantement Solidité : chance de ne pas consommer de durabilité.
+    const u = (s.ench && s.ench.unbreaking) || 0;
+    if (u > 0 && Math.random() < u / (u + 1)) return 'ok';
+    s.dur--;
+    if (s.dur <= 0) {
+      this.slots[this.selected] = null;
+      this.touch();
+      return 'broke';
+    }
+    this.touch();
+    return 'ok';
   }
 
   // Combien d'un id donné l'inventaire contient-il au total ?

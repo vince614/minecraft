@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { LEATHER, FEATHER, MEAT, ROTTEN } from '../blocks/BlockRegistry.js';
+import { LEATHER, FEATHER, MEAT, ROTTEN, POWDER, ARROW } from '../blocks/BlockRegistry.js';
 import { buildMobModel } from './mobModels.js';
 
 // Caractéristiques par type de mob. hostile = attaque le joueur ; drop = objet
@@ -10,10 +10,13 @@ export const MOB_DEFS = {
   sheep:    { hw: 0.45, height: 1.2, speed: 1.7, health: 8,  hostile: false, drop: MEAT },
   chicken:  { hw: 0.25, height: 0.6, speed: 1.6, health: 4,  hostile: false, drop: FEATHER },
   zombie:   { hw: 0.3,  height: 1.9, speed: 2.6, health: 16, hostile: true,  attack: 3, drop: ROTTEN },
+  creeper:  { hw: 0.3,  height: 1.7, speed: 2.4, health: 14, hostile: true,  creeper: true, drop: POWDER },
+  skeleton: { hw: 0.3,  height: 1.9, speed: 2.2, health: 14, hostile: true,  ranged: true, drop: ARROW },
   villager: { hw: 0.3,  height: 1.9, speed: 1.4, health: 12, hostile: false, villager: true },
 };
 
 export const PASSIVE_TYPES = ['cow', 'pig', 'sheep', 'chicken'];
+export const HOSTILE_TYPES = ['zombie', 'zombie', 'creeper', 'skeleton']; // zombie plus fréquent
 
 export class Mob {
   constructor(type, position) {
@@ -41,6 +44,14 @@ export class Mob {
     this.aggro = false;       // zombie a repéré le joueur
     this.homeX = position.x;  // ancrage (villageois)
     this.homeZ = position.z;
+
+    this.fuse = 0;            // mèche du creeper
+    this.love = false;       // mode reproduction (animaux nourris)
+    this.loveTimer = 0;
+    this.breedCd = 0;        // anti-spam après reproduction
+    this.isBaby = false;     // bébé (plus petit, grandit)
+    this.growTimer = 0;
+    this.rangedCd = 0;       // cooldown de tir (squelette)
 
     this.model = buildMobModel(type);
     this.model.group.position.copy(position);

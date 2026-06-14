@@ -122,6 +122,38 @@ function makeChicken() {
   };
 }
 
+// Creeper : corps vert dressé, 4 pattes courtes, pas de bras.
+function makeCreeper() {
+  const group = new THREE.Group();
+  const green = 0x4f9a3a;
+  const body = box(0.5, 0.85, 0.35, green);
+  body.position.y = 0.65;
+  group.add(body);
+  const head = box(0.5, 0.5, 0.5, 0x5aa845);
+  head.position.y = 1.3;
+  group.add(head);
+  // yeux/bouche sombres
+  const face = box(0.52, 0.2, 0.1, 0x153015);
+  face.position.set(0, 1.32, -0.21);
+  group.add(face);
+  const legs = [
+    limb(group, -0.15, 0.22, -0.12, 0.18, 0.22, 0.18, green),
+    limb(group, 0.15, 0.22, -0.12, 0.18, 0.22, 0.18, green),
+    limb(group, -0.15, 0.22, 0.12, 0.18, 0.22, 0.18, green),
+    limb(group, 0.15, 0.22, 0.12, 0.18, 0.22, 0.18, green),
+  ];
+  let time = 0;
+  return {
+    group,
+    animate(dt, moving) {
+      time += dt;
+      const a = moving ? Math.sin(time * 8) * 0.4 : 0;
+      legs[0].rotation.x = a; legs[3].rotation.x = a;
+      legs[1].rotation.x = -a; legs[2].rotation.x = -a;
+    },
+  };
+}
+
 // Fabrique le modèle correspondant à un type de mob.
 export function buildMobModel(type) {
   switch (type) {
@@ -137,6 +169,10 @@ export function buildMobModel(type) {
       return makeHumanoid({ skin: 0x4f7a3a, shirt: 0x3a6a8a, pants: 0x33408c, armsForward: true });
     case 'villager':
       return makeHumanoid({ skin: 0xc99a6a, shirt: 0x6a4a34, pants: 0x4a3424, nose: 0xb98a5a });
+    case 'creeper':
+      return makeCreeper();
+    case 'skeleton':
+      return makeHumanoid({ skin: 0xd8d8d0, shirt: 0xc4c4bc, pants: 0xb0b0a8, armsForward: true });
     default:
       return makeQuadruped({ body: 0xff00ff, head: 0xff00ff, bodyW: 0.6, bodyH: 0.6, bodyL: 1, legH: 0.5 });
   }

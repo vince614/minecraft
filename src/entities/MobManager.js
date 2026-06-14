@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CHUNK_HEIGHT } from '../core/constants.js';
 import { isSolid, isWater, itemColor } from '../blocks/BlockRegistry.js';
 import { moveBox } from '../player/Physics.js';
-import { Mob, MOB_DEFS, PASSIVE_TYPES } from './Mob.js';
+import { Mob, MOB_DEFS, PASSIVE_TYPES, HOSTILE_TYPES } from './Mob.js';
 
 const GRAVITY = 26;
 const JUMP = 7;
@@ -22,12 +22,15 @@ export class MobManager {
     this.ctx = ctx;
     this.mobs = [];
     this.spawnTimer = 0;
+    this.peaceful = false; // mode paisible : aucun hostile
+    this._t = 0; // horloge interne (clignotement creeper)
 
     this._tmpA = new THREE.Vector3();
     this._tmpB = new THREE.Vector3();
   }
 
   update(dt) {
+    this._t += dt;
     this.spawnTimer += dt;
     if (this.spawnTimer > 1.2) {
       this.spawnTimer = 0;
@@ -44,10 +47,12 @@ export class MobManager {
       const dz = mob.position.z - player.position.z;
       const far = dx * dx + dz * dz > 80 * 80;
       const burn = mob.hostile && !this.ctx.isNight() && dx * dx + dz * dz > 24 * 24;
-      if (mob.dead || mob.position.y < -6 || far || burn) {
+      if (mob.dead || mob.position.y < -6 || far || burn || (this.peaceful && mob.hostile)) {
         this._remove(i);
       }
     }
+
+    this._breeding();
   }
 
   // --- IA + physique d'un mob ---------------------------------------------
@@ -57,22 +62,40 @@ export class MobManager {
     mob.wanderTimer -= dt;
     mob.fleeTimer -= dt;
     mob.attackCd -= dt;
+    mob.breedCd -= dt;
+    mob.rangedCd -= dt;
+
+    // Mode amour (animaux nourris) : cœurs + décompte.
+    if (mob.loveTimer > 0) {
+      mob.loveTimer -= dt;
+      if (mob.loveTimer <= 0) mob.love = false;
+      else if (Math.random() < 0.2) {
+        this.ctx.particles.emit(mob.position.x, mob.position.y + mob.height, mob.position.z, '#ff5da2', 1, 0.5);
+      }
+    }
+    // Croissance des bébés.
+    if (mob.isBaby) {
+      mob.growTimer -= dt;
+      if (mob.growTimer <= 0) { mob.isBaby = false; mob.model.group.scale.setScalar(1); }
+    }
 
     let moving = false;
+    const d2 = this._dist2(mob, player.position);
 
     if (mob.fleeTimer > 0) {
-      // Fuite : cap opposé au joueur, vitesse pleine.
       this._headAway(mob, player.position.x, player.position.z);
       this._applyHeading(mob, mob.speed);
       moving = true;
+    } else if (mob.def.creeper) {
+      moving = this._creeperAI(mob, dt, d2);
+    } else if (mob.def.ranged) {
+      moving = this._skeletonAI(mob, dt, d2);
     } else if (mob.hostile) {
-      const d2 = this._dist2(mob, player.position);
       if (d2 < AGGRO_RANGE * AGGRO_RANGE) mob.aggro = true;
       if (mob.aggro && d2 < 40 * 40) {
         this._headToward(mob, player.position.x, player.position.z);
         this._applyHeading(mob, mob.speed);
         moving = true;
-        // Attaque au contact.
         if (d2 < 2.0 * 2.0 && mob.attackCd <= 0) {
           player.damage(mob.def.attack);
           mob.attackCd = 1.0;
@@ -166,8 +189,9 @@ export class MobManager {
     // Villageois près d'un village proche.
     if (counts.villager < VILLAGER_CAP) this._trySpawnVillager();
 
-    if (night && counts.hostile < HOSTILE_CAP) {
-      this._spawnNearPlayer('zombie', 14, 36);
+    if (night && !this.peaceful && counts.hostile < HOSTILE_CAP) {
+      const type = HOSTILE_TYPES[(Math.random() * HOSTILE_TYPES.length) | 0];
+      this._spawnNearPlayer(type, 14, 36);
     } else if (!night && counts.passive < PASSIVE_CAP) {
       const type = PASSIVE_TYPES[(Math.random() * PASSIVE_TYPES.length) | 0];
       this._spawnNearPlayer(type, 12, 40, true);
@@ -270,24 +294,129 @@ export class MobManager {
     return tmin;
   }
 
-  // Le joueur frappe un mob.
-  attackMob(mob) {
-    mob.health -= PLAYER_ATTACK;
-    // Recul + petit saut.
+  // Inflige des dégâts à un mob (recul + réactions).
+  damageMob(mob, dmg, kx = 0, kz = 0) {
+    mob.health -= dmg;
+    mob.velocity.x += kx;
+    mob.velocity.z += kz;
+    mob.velocity.y = Math.max(mob.velocity.y, 3);
+    if (mob.hostile) mob.aggro = true;
+    else mob.fleeTimer = 5;
+    this.ctx.sound.playHit();
+    this.ctx.particles.emit(mob.position.x, mob.position.y + mob.height * 0.6, mob.position.z, '#c0392b', 5, 2);
+    if (mob.health <= 0) this._die(mob);
+  }
+
+  // Le joueur frappe un mob (recul à l'opposé du joueur).
+  attackMob(mob, dmg = PLAYER_ATTACK) {
     const p = this.ctx.player.position;
     const dx = mob.position.x - p.x, dz = mob.position.z - p.z;
     const len = Math.hypot(dx, dz) || 1;
-    mob.velocity.x += (dx / len) * 6;
-    mob.velocity.z += (dz / len) * 6;
-    mob.velocity.y = 4;
+    this.damageMob(mob, dmg, (dx / len) * 6, (dz / len) * 6);
+  }
 
-    if (mob.hostile) mob.aggro = true;
-    else mob.fleeTimer = 5;
+  // Nourrir un animal -> mode reproduction.
+  feed(mob) {
+    if (mob.hostile || mob.def.villager || mob.isBaby) return false;
+    mob.love = true;
+    mob.loveTimer = 20;
+    for (let i = 0; i < 6; i++) {
+      this.ctx.particles.emit(mob.position.x, mob.position.y + mob.height, mob.position.z, '#ff5da2', 1, 1);
+    }
+    return true;
+  }
 
-    this.ctx.sound.playHit();
-    this.ctx.particles.emit(mob.position.x, mob.position.y + mob.height * 0.6, mob.position.z, '#c0392b', 5, 2);
+  // IA creeper : approche, puis gonfle et explose à courte portée.
+  _creeperAI(mob, dt, d2) {
+    const player = this.ctx.player;
+    if (d2 < AGGRO_RANGE * AGGRO_RANGE) mob.aggro = true;
+    if (!mob.aggro || d2 > 40 * 40) {
+      mob.fuse = 0; this._creeperScale(mob, 0);
+      return this._wander(mob);
+    }
+    this._headToward(mob, player.position.x, player.position.z);
+    if (d2 < 2.8 * 2.8) {
+      mob.fuse += dt;
+      this._creeperScale(mob, mob.fuse / 1.5);
+      if (mob.fuse >= 1.5) { this._creeperExplode(mob); return false; }
+      this._applyHeading(mob, 0);
+      return false;
+    }
+    mob.fuse = Math.max(0, mob.fuse - dt * 2);
+    this._creeperScale(mob, mob.fuse / 1.5);
+    this._applyHeading(mob, mob.speed);
+    return true;
+  }
 
-    if (mob.health <= 0) this._die(mob);
+  _creeperScale(mob, f) {
+    const s = 1 + 0.25 * f * Math.abs(Math.sin(this._t * 20));
+    mob.model.group.scale.setScalar(s);
+  }
+
+  _creeperExplode(mob) {
+    this.ctx.explode(mob.position.x, mob.position.y + 0.7, mob.position.z, 3);
+    mob.dead = true; // l'explosion remplace le butin
+  }
+
+  // IA squelette : garde ses distances et tire des flèches.
+  _skeletonAI(mob, dt, d2) {
+    const player = this.ctx.player;
+    if (d2 < (AGGRO_RANGE + 4) * (AGGRO_RANGE + 4)) mob.aggro = true;
+    if (!mob.aggro || d2 > 42 * 42) return this._wander(mob);
+
+    const dist = Math.sqrt(d2);
+    let moving = true;
+    if (dist < 5) {
+      this._headAway(mob, player.position.x, player.position.z);
+      this._applyHeading(mob, mob.speed);
+    } else if (dist > 13) {
+      this._headToward(mob, player.position.x, player.position.z);
+      this._applyHeading(mob, mob.speed);
+    } else {
+      this._headToward(mob, player.position.x, player.position.z);
+      this._applyHeading(mob, 0);
+      moving = false;
+    }
+    if (mob.rangedCd <= 0 && dist < 18 && this.ctx.projectiles) {
+      this._shootAtPlayer(mob);
+      mob.rangedCd = 1.8;
+    }
+    return moving;
+  }
+
+  _shootAtPlayer(mob) {
+    const origin = this._tmpA.set(mob.position.x, mob.position.y + mob.height * 0.8, mob.position.z);
+    const target = this.ctx.player.getEyePosition(this._tmpB);
+    const dir = target.clone().sub(origin);
+    dir.y += dir.length() * 0.05; // léger arc pour compenser la gravité
+    this.ctx.projectiles.spawn(origin.clone(), dir, { fromPlayer: false, damage: 4, speed: 22 });
+  }
+
+  // Reproduction : deux animaux amoureux proches font un bébé.
+  _breeding() {
+    for (let i = 0; i < this.mobs.length; i++) {
+      const a = this.mobs[i];
+      if (!a.love || a.breedCd > 0 || a.isBaby) continue;
+      for (let j = i + 1; j < this.mobs.length; j++) {
+        const b = this.mobs[j];
+        if (b.type !== a.type || !b.love || b.breedCd > 0 || b.isBaby) continue;
+        const dx = a.position.x - b.position.x, dz = a.position.z - b.position.z;
+        if (dx * dx + dz * dz < 4 * 4) {
+          a.love = b.love = false;
+          a.loveTimer = b.loveTimer = 0;
+          a.breedCd = b.breedCd = 30;
+          const baby = new Mob(a.type, a.position.clone());
+          baby.isBaby = true;
+          baby.growTimer = 45;
+          baby.model.group.scale.setScalar(0.55);
+          this._add(baby);
+          for (let k = 0; k < 8; k++) {
+            this.ctx.particles.emit(a.position.x, a.position.y + 0.5, a.position.z, '#ff5da2', 1, 1);
+          }
+          break;
+        }
+      }
+    }
   }
 
   _die(mob) {

@@ -9,6 +9,7 @@ export function saveGame(game) {
   try {
     const data = {
       edits: Array.from(game.world.edits.entries()), // [["wx,wy,wz", id], ...]
+      chests: Array.from(game.world.chests.entries()), // contenu des coffres
       inventory: game.inventory.slots,
       selected: game.inventory.selected,
       player: {
@@ -43,6 +44,9 @@ export function loadGame(game) {
 
     if (Array.isArray(data.edits)) {
       game.world.edits = new Map(data.edits);
+    }
+    if (Array.isArray(data.chests)) {
+      game.world.chests = new Map(data.chests);
     }
     if (Array.isArray(data.inventory)) {
       game.inventory.slots = data.inventory;

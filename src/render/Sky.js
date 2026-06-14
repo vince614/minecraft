@@ -25,6 +25,14 @@ export class Sky {
     scene.fog = new THREE.Fog(DAY.clone(), far * 0.55, far * 0.95);
     scene.background = DAY.clone();
 
+    // Réglages (modifiables via les options).
+    this.brightness = 1;
+    this.fogEnabled = true;
+    this.dayLength = DAY_LENGTH;
+    this.weatherEnabled = true;
+    this._fogNear = far * 0.55;
+    this._fogFar = far * 0.95;
+
     // Lumières (pour les meshes non-shader : avatar, bras, highlight).
     this.sun = new THREE.DirectionalLight(0xffffff, 1.0);
     scene.add(this.sun);
@@ -38,6 +46,51 @@ export class Sky {
     this._buildStars();
     this._buildSunMoon();
     this._buildClouds();
+    this._buildRain();
+
+    // Météo : alterne ciel clair / pluie.
+    this.raining = false;
+    this.weatherTimer = 40 + Math.random() * 40;
+  }
+
+  _buildRain() {
+    const N = 800;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      pos[i * 3] = (Math.random() - 0.5) * 40;
+      pos[i * 3 + 1] = Math.random() * 30 - 5;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 40;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.rainMat = new THREE.PointsMaterial({
+      color: 0xaecbe6, size: 2.2, sizeAttenuation: false,
+      transparent: true, opacity: 0.6, depthWrite: false, fog: true,
+    });
+    this.rain = new THREE.Points(geo, this.rainMat);
+    this.rain.visible = false;
+    this.rain.frustumCulled = false;
+    this.scene.add(this.rain);
+  }
+
+  _updateWeather(dt) {
+    this.weatherTimer -= dt;
+    if (this.weatherTimer <= 0) {
+      this.raining = !this.raining;
+      this.weatherTimer = this.raining ? 25 + Math.random() * 25 : 60 + Math.random() * 60;
+    }
+    this.rain.visible = this.raining;
+    if (!this.raining) return;
+
+    // La nappe de pluie suit la caméra ; les gouttes tombent et bouclent.
+    this.rain.position.set(this.camera.position.x, this.camera.position.y, this.camera.position.z);
+    const p = this.rain.geometry.attributes.position;
+    const arr = p.array;
+    for (let i = 1; i < arr.length; i += 3) {
+      arr[i] -= 28 * dt;
+      if (arr[i] < -15) arr[i] += 30;
+    }
+    p.needsUpdate = true;
   }
 
   _buildStars() {
@@ -85,8 +138,13 @@ export class Sky {
     this.dome.add(this.clouds);
   }
 
+  setFogDistance(far) {
+    this._fogNear = far * 0.55;
+    this._fogFar = far * 0.95;
+  }
+
   update(dt) {
-    this.time = (this.time + dt / DAY_LENGTH) % 1;
+    this.time = (this.time + dt / this.dayLength) % 1;
 
     // Le dôme suit la caméra pour que le ciel reste « à l'infini ».
     this.dome.position.copy(this.camera.position);
@@ -110,14 +168,22 @@ export class Sky {
     sky.lerp(SUNSET, sunset * 0.6 * (dayFactor > -0.1 ? 1 : 0));
     this.scene.background.copy(sky);
     this.scene.fog.color.copy(sky);
+    if (this.fogEnabled) {
+      this.scene.fog.near = this._fogNear;
+      this.scene.fog.far = this._fogFar;
+    } else {
+      this.scene.fog.near = 1e5;
+      this.scene.fog.far = 1e5 + 1;
+    }
 
-    // Lumières scène.
+    // Lumières scène (modulées par la luminosité).
+    const b = this.brightness;
     this.sun.position.copy(sunDir).multiplyScalar(100);
-    this.sun.intensity = 0.2 + dayFactor * 0.9;
-    this.ambient.intensity = 0.25 + dayFactor * 0.35;
+    this.sun.intensity = (0.2 + dayFactor * 0.9) * b;
+    this.ambient.intensity = (0.25 + dayFactor * 0.35) * b;
 
     // Éclairage du shader des blocs : direction du soleil + ambiant variable.
-    const amb = 0.25 + dayFactor * 0.25;
+    const amb = Math.min(1, (0.25 + dayFactor * 0.25) * b);
     for (const m of [this.materials.blockMaterial, this.materials.waterMaterial]) {
       m.uniforms.uLightDir.value.copy(sunDir);
       m.uniforms.uAmbient.value = amb;
@@ -130,6 +196,21 @@ export class Sky {
     // Dérive des nuages.
     this.cloudTex.offset.x += dt * 0.004;
     this.cloudMat.opacity = 0.5 + dayFactor * 0.4;
+
+    // Météo (pluie) : assombrit et grise le ciel.
+    if (this.weatherEnabled) this._updateWeather(dt);
+    else { this.raining = false; this.rain.visible = false; }
+    if (this.raining) {
+      const grey = new THREE.Color(0x6a7480);
+      this.scene.background.lerp(grey, 0.55);
+      this.scene.fog.color.copy(this.scene.background);
+      this.sun.intensity *= 0.5;
+      this.ambient.intensity *= 0.85;
+      for (const m of [this.materials.blockMaterial, this.materials.waterMaterial]) {
+        m.uniforms.uAmbient.value *= 0.8;
+      }
+      this.cloudMat.opacity = Math.min(1, this.cloudMat.opacity + 0.3);
+    }
   }
 }
 

@@ -24,12 +24,16 @@
     #hud { position: fixed; top: 8px; left: 8px; z-index: 10; color: #fff; font-size: 13px;
       font-family: monospace; text-shadow: 1px 1px 0 #000; pointer-events: none; line-height: 1.5; }
 
-    /* Barre de vie (cœurs) */
-    #health { position: fixed; bottom: 74px; left: 50%; transform: translateX(-50%);
+    /* Barre de vie (cœurs) + faim (cuisses) */
+    #health { position: fixed; bottom: 74px; left: calc(50% - 6px); transform: translateX(-100%);
       display: flex; gap: 2px; z-index: 10; pointer-events: none; }
     #health .heart { font-size: 20px; line-height: 1; color: #e23b3b;
       text-shadow: 1px 1px 0 #000, -1px 0 0 #5a0e0e; }
     #health .heart.empty { color: #3a3a3a; text-shadow: 1px 1px 0 #000; }
+    #hunger { position: fixed; bottom: 74px; left: calc(50% + 6px);
+      display: flex; gap: 2px; z-index: 10; pointer-events: none; }
+    #hunger .drum { font-size: 17px; line-height: 1; filter: drop-shadow(1px 1px 0 #000); }
+    #hunger .drum.empty { opacity: 0.28; filter: grayscale(1) drop-shadow(1px 1px 0 #000); }
 
     /* Barre de progression de minage (sous le réticule) */
     #mine-progress { position: fixed; top: calc(50% + 22px); left: 50%; transform: translateX(-50%);
@@ -57,6 +61,13 @@
       font-weight: bold; text-shadow: 1px 1px 0 #000; }
     .slot .name { position: absolute; bottom: 1px; left: 0; right: 0; text-align: center;
       font-size: 8px; color: #fff; opacity: 0.85; pointer-events: none; }
+
+    /* Barres de durabilité */
+    .durbar > span { display: block; height: 100%; }
+    .slot .durbar { position: absolute; bottom: 11px; left: 5px; right: 5px; height: 3px;
+      background: rgba(0,0,0,0.55); border-radius: 2px; overflow: hidden; }
+    .iv-slot .durbar { position: absolute; bottom: 3px; left: 5px; right: 5px; height: 4px;
+      background: rgba(0,0,0,0.55); border-radius: 2px; overflow: hidden; }
 
     /* ---- Écrans plein écran (menu, pause, inventaire) ---- */
     .screen { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column;
@@ -88,6 +99,56 @@
     .option input[type=range] { width: 100%; }
     .help { font-size: 13px; line-height: 1.9; opacity: 0.9; max-width: 560px;
       background: rgba(0,0,0,0.25); padding: 12px 18px; border-radius: 6px; }
+    .title.sm { font-size: 34px; }
+    .menu-buttons.row { flex-direction: row; width: auto; }
+
+    /* Liste des mondes */
+    .world-list { width: 460px; max-height: 46vh; overflow-y: auto; display: flex;
+      flex-direction: column; gap: 8px; }
+    .world-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      background: rgba(0,0,0,0.4); border: 2px solid #2b2b2b; border-radius: 6px; }
+    .world-row .wr-info { flex: 1; text-align: left; }
+    .world-row .wr-name { font-size: 16px; font-weight: bold; }
+    .world-row .wr-meta { font-size: 12px; opacity: 0.7; }
+    .world-row .wr-badge { font-size: 11px; padding: 2px 7px; border-radius: 10px;
+      background: #3f8a34; }
+    .world-row .wr-badge.creative { background: #5a7ad0; }
+    .world-row .mini { font-size: 13px; padding: 7px 12px; }
+    .world-row .mini.del { background: linear-gradient(#a04040, #803030); }
+    .world-empty { opacity: 0.6; font-size: 14px; padding: 20px; }
+
+    /* Formulaire création */
+    .form { display: flex; flex-direction: column; gap: 16px; width: 420px; text-align: left;
+      background: rgba(0,0,0,0.35); padding: 22px; border-radius: 8px; border: 2px solid #2b2b2b; }
+    .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+    .field small { opacity: 0.6; }
+    .input, .select, .form input[type=text] { font-size: 15px; padding: 9px 12px; border-radius: 5px;
+      border: 2px solid #555; background: #1d1d1d; color: #fff; outline: none; width: 100%; }
+    .input:focus, .form input:focus { border-color: #5aa64a; }
+    .seg { display: flex; gap: 6px; }
+    .seg-btn { flex: 1; font-size: 14px; padding: 9px; border-radius: 5px; cursor: pointer;
+      background: #3a3a3a; border: 2px solid #222; color: #ddd; }
+    .seg-btn.active { background: #3f8a34; border-color: #5aa64a; color: #fff; }
+
+    /* Multijoueur */
+    .mp-row { display: flex; gap: 18px; }
+    .mp-card { width: 260px; background: rgba(0,0,0,0.4); border: 2px solid #2b2b2b;
+      border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+    .mp-card h3 { font-size: 18px; }
+    .mp-card p { font-size: 12px; opacity: 0.75; }
+    .mp-info { font-size: 13px; min-height: 20px; word-break: break-all; }
+    .mp-info code { background: #1d1d1d; padding: 3px 8px; border-radius: 4px; color: #6edc8a;
+      font-size: 16px; letter-spacing: 1px; user-select: all; }
+
+    /* Onglets d'options */
+    .opt-tabs { display: flex; gap: 6px; }
+    .otab { font-size: 14px; padding: 8px 14px; border-radius: 5px 5px 0 0; cursor: pointer;
+      background: #2a2a2a; border: 2px solid #222; border-bottom: none; color: #ccc; }
+    .otab.active { background: rgba(0,0,0,0.35); color: #fff; }
+    .opt-panel { display: flex; flex-direction: column; gap: 16px; width: 420px;
+      background: rgba(0,0,0,0.35); padding: 20px; border-radius: 0 8px 8px 8px; border: 2px solid #2b2b2b; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+    .check input { width: 16px; height: 16px; }
 
     /* ---- Inventaire / craft ---- */
     .inv-window { background: #c6c6c6; border: 4px solid #373737; border-radius: 4px;
@@ -110,6 +171,52 @@
     #inv-hotbar.grid { grid-template-columns: repeat(9, 46px); }
     #inv-main.grid { grid-template-columns: repeat(9, 46px); grid-template-rows: repeat(3, 46px); }
 
+    /* Guide de craft */
+    .guide-window { background: #2b2b30; border: 4px solid #111; border-radius: 6px;
+      width: 560px; max-height: 78vh; display: flex; flex-direction: column; color: #eee;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.55); }
+    .guide-head { display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; border-bottom: 2px solid #111; }
+    .guide-head .gh-title { font-size: 18px; font-weight: bold; }
+    .guide-head .gh-hint { font-size: 12px; opacity: 0.7; }
+    #guide-list { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .recipe { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 5px;
+      background: #1f1f23; border: 1px solid #000; opacity: 0.5; cursor: default; }
+    .recipe.craftable { opacity: 1; background: #2f3a2a; border-color: #5aa64a; cursor: pointer; }
+    .recipe.craftable:hover { background: #3a4a32; }
+    .recipe .ings { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+    .recipe .r-arrow { font-size: 18px; opacity: 0.8; }
+    .recipe .result { display: flex; align-items: center; gap: 6px; min-width: 150px; }
+    .recipe .r-name { font-size: 13px; }
+    .g-item { position: relative; width: 30px; height: 30px; }
+    .g-sw { position: absolute; inset: 0; border-radius: 3px; image-rendering: pixelated;
+      border: 1px solid rgba(0,0,0,0.4); }
+    .g-n { position: absolute; bottom: -2px; right: -2px; font-size: 12px; font-weight: bold;
+      color: #fff; text-shadow: 1px 1px 0 #000; }
+
+    .gbtn { font-size: 13px; padding: 4px 10px; cursor: pointer; color: #fff;
+      background: #4a4a52; border: 1px solid #111; border-radius: 4px; }
+    .gbtn:hover { background: #5a5a64; }
+
+    /* Table d'enchantement */
+    .ench-window { background: #2b2436; border: 4px solid #1a1322; border-radius: 6px;
+      width: 440px; padding: 18px; color: #eee; display: flex; flex-direction: column; gap: 14px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.55); }
+    #ench-tool { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3);
+      padding: 10px; border-radius: 6px; min-height: 40px; }
+    #ench-tool .swatch { width: 36px; height: 36px; border-radius: 3px; image-rendering: pixelated;
+      background-size: cover; }
+    .ench-name { font-size: 16px; font-weight: bold; }
+    .ench-dia { margin-left: auto; font-size: 14px; }
+    .ench-msg { opacity: 0.8; font-size: 14px; }
+    #ench-list { display: flex; flex-direction: column; gap: 8px; }
+    .ench-row { display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; border-radius: 5px; background: #1f1830; border: 1px solid #000; opacity: 0.55; }
+    .ench-row.ok { opacity: 1; background: #33284a; border-color: #9a6bd0; cursor: pointer; }
+    .ench-row.ok:hover { background: #3e3158; }
+    .er-stars { color: #c89bf0; letter-spacing: 2px; }
+    .er-cost { font-size: 13px; }
+
     /* Pile « tenue » par le curseur */
     #cursor-stack { position: fixed; width: 40px; height: 40px; pointer-events: none; z-index: 50;
       transform: translate(-50%, -50%); display: none; }
@@ -126,46 +233,124 @@
   <div id="mine-progress"><div></div></div>
   <div id="hud"></div>
   <div id="health"></div>
+  <div id="hunger"></div>
   <div id="hotbar"></div>
 
   <div id="damage-flash"></div>
   <div id="underwater"></div>
 
-  <!-- ===================== MENU PRINCIPAL ===================== -->
+  <!-- ===================== MENU ===================== -->
   <div id="menu" class="screen">
-    <div id="menu-main" class="menu-view">
+    <!-- Accueil -->
+    <div id="mv-main" class="menu-view">
       <div class="title">MINECRAFT CLONE</div>
       <div class="subtitle">Three.js · moteur voxel</div>
       <div class="menu-buttons">
-        <button class="btn primary" data-action="play">▶ Jouer</button>
+        <button class="btn primary" data-action="solo">🌍 Solo</button>
+        <button class="btn" data-action="multi">👥 Multijoueur</button>
         <button class="btn" data-action="options">⚙ Options</button>
       </div>
       <div class="help">
-        <strong>WASD</strong> se déplacer · <strong>Souris</strong> regarder · <strong>Espace</strong> sauter ·
-        <strong>Clic G</strong> casser · <strong>Clic D</strong> poser<br />
-        <strong>1–9 / molette</strong> bloc · <strong>E</strong> inventaire · <strong>F</strong> vol ·
-        <strong>F5</strong> 3<sup>e</sup> personne · <strong>Échap</strong> pause
+        <strong>WASD</strong> bouger · <strong>Souris</strong> regarder · <strong>Clic G</strong> casser/frapper ·
+        <strong>Clic D</strong> poser/utiliser · <strong>E</strong> inventaire · <strong>C</strong> guide ·
+        <strong>F</strong> vol (créatif) · <strong>F5</strong> 3<sup>e</sup> pers. · <strong>Échap</strong> pause
       </div>
     </div>
 
-    <div id="menu-options" class="menu-view options hidden">
-      <div class="inv-title" style="color:#fff">Options</div>
-      <div class="option">
-        <label><span>Distance de rendu</span><span id="opt-rd-val">8</span></label>
-        <input type="range" id="opt-rd" min="4" max="12" step="1" value="8" />
+    <!-- Liste des mondes -->
+    <div id="mv-worlds" class="menu-view hidden">
+      <div class="title sm">Mes mondes</div>
+      <div id="world-list" class="world-list"></div>
+      <div class="menu-buttons row">
+        <button class="btn primary" data-action="create">➕ Créer un monde</button>
+        <button class="btn" data-action="back-main">Retour</button>
       </div>
-      <div class="option">
-        <label><span>Sensibilité souris</span><span id="opt-sens-val">1.0</span></label>
-        <input type="range" id="opt-sens" min="0.3" max="3" step="0.1" value="1.0" />
+    </div>
+
+    <!-- Création de monde -->
+    <div id="mv-create" class="menu-view hidden">
+      <div class="title sm">Créer un monde</div>
+      <div class="form">
+        <label class="field">Nom du monde
+          <input id="cw-name" type="text" maxlength="40" placeholder="Mon monde" />
+        </label>
+        <label class="field">Seed <small>(vide = aléatoire)</small>
+          <input id="cw-seed" type="text" placeholder="aléatoire" />
+        </label>
+        <div class="field">Mode de jeu
+          <div class="seg" id="cw-mode">
+            <button class="seg-btn active" data-mode="survival">🛡️ Survie</button>
+            <button class="seg-btn" data-mode="creative">✨ Créatif</button>
+          </div>
+        </div>
       </div>
-      <div class="option">
-        <label><span>Champ de vision (FOV)</span><span id="opt-fov-val">75</span></label>
-        <input type="range" id="opt-fov" min="60" max="100" step="1" value="75" />
+      <div class="menu-buttons row">
+        <button class="btn primary" data-action="create-confirm">Créer et jouer</button>
+        <button class="btn" data-action="back-worlds">Retour</button>
       </div>
-      <div class="option">
-        <label><span>Volume</span><span id="opt-vol-val">70%</span></label>
-        <input type="range" id="opt-vol" min="0" max="1" step="0.05" value="0.7" />
+    </div>
+
+    <!-- Multijoueur -->
+    <div id="mv-multi" class="menu-view hidden">
+      <div class="title sm">Multijoueur</div>
+      <div class="mp-row">
+        <div class="mp-card">
+          <h3>🖧 Héberger</h3>
+          <p>Crée un salon depuis un de tes mondes et partage le code.</p>
+          <select id="mp-host-world" class="select"></select>
+          <button class="btn primary" data-action="host">Héberger</button>
+          <div id="mp-host-info" class="mp-info"></div>
+        </div>
+        <div class="mp-card">
+          <h3>🔌 Rejoindre</h3>
+          <p>Entre le code de salon d'un ami.</p>
+          <input id="mp-code" type="text" class="input" placeholder="Code du salon" />
+          <button class="btn primary" data-action="join">Rejoindre</button>
+          <div id="mp-join-info" class="mp-info"></div>
+        </div>
       </div>
+      <button class="btn" data-action="back-main">Retour</button>
+    </div>
+
+    <!-- Options -->
+    <div id="mv-options" class="menu-view options hidden">
+      <div class="title sm">Options</div>
+      <div class="opt-tabs">
+        <button class="otab active" data-tab="gfx">Graphismes</button>
+        <button class="otab" data-tab="aud">Audio & contrôles</button>
+        <button class="otab" data-tab="game">Jeu</button>
+      </div>
+
+      <div class="opt-panel" data-panel="gfx">
+        <div class="option"><label><span>Distance de rendu</span><span id="opt-rd-val">8</span></label>
+          <input type="range" id="opt-rd" min="4" max="12" step="1" value="8" /></div>
+        <div class="option"><label><span>Champ de vision (FOV)</span><span id="opt-fov-val">75</span></label>
+          <input type="range" id="opt-fov" min="60" max="110" step="1" value="75" /></div>
+        <div class="option"><label><span>Luminosité</span><span id="opt-bright-val">100%</span></label>
+          <input type="range" id="opt-bright" min="0.5" max="1.6" step="0.05" value="1" /></div>
+        <label class="check"><input type="checkbox" id="opt-fog" checked /> Brouillard de distance</label>
+      </div>
+
+      <div class="opt-panel hidden" data-panel="aud">
+        <div class="option"><label><span>Volume</span><span id="opt-vol-val">70%</span></label>
+          <input type="range" id="opt-vol" min="0" max="1" step="0.05" value="0.7" /></div>
+        <div class="option"><label><span>Sensibilité souris</span><span id="opt-sens-val">1.0</span></label>
+          <input type="range" id="opt-sens" min="0.3" max="3" step="0.1" value="1.0" /></div>
+        <label class="check"><input type="checkbox" id="opt-invy" /> Inverser l'axe Y</label>
+      </div>
+
+      <div class="opt-panel hidden" data-panel="game">
+        <div class="field">Difficulté
+          <div class="seg" id="opt-diff">
+            <button class="seg-btn" data-diff="peaceful">☮️ Paisible</button>
+            <button class="seg-btn active" data-diff="normal">⚔️ Normale</button>
+          </div>
+        </div>
+        <div class="option"><label><span>Durée du cycle jour/nuit</span><span id="opt-day-val">180 s</span></label>
+          <input type="range" id="opt-day" min="60" max="600" step="10" value="180" /></div>
+        <label class="check"><input type="checkbox" id="opt-weather" checked /> Météo (pluie)</label>
+      </div>
+
       <button class="btn" data-action="options-back">Retour</button>
     </div>
   </div>
@@ -176,14 +361,17 @@
     <div class="menu-buttons">
       <button class="btn primary" data-action="resume">Reprendre</button>
       <button class="btn" data-action="pause-options">⚙ Options</button>
-      <button class="btn" data-action="quit">Menu principal</button>
+      <button class="btn" data-action="quit">Sauvegarder & quitter</button>
     </div>
   </div>
 
   <!-- ===================== INVENTAIRE / CRAFT ===================== -->
   <div id="inventory" class="screen hidden">
     <div class="inv-window">
-      <div class="inv-title" id="inv-heading">Inventaire</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="inv-title" id="inv-heading">Inventaire</div>
+        <button class="gbtn" id="open-guide-btn">📖 Guide de craft (C)</button>
+      </div>
       <div class="craft-area">
         <div id="craft-grid" class="grid"></div>
         <div class="craft-arrow">➜</div>
@@ -193,6 +381,29 @@
         <div id="inv-main" class="grid"></div>
         <div id="inv-hotbar" class="grid"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ===================== GUIDE DE CRAFT ===================== -->
+  <div id="guide" class="screen hidden">
+    <div class="guide-window">
+      <div class="guide-head">
+        <span class="gh-title">📖 Guide de craft</span>
+        <span class="gh-hint">Recette verte = réalisable · clique pour fabriquer · C/Échap pour fermer</span>
+      </div>
+      <div id="guide-list"></div>
+    </div>
+  </div>
+
+  <!-- ===================== TABLE D'ENCHANTEMENT ===================== -->
+  <div id="enchant" class="screen hidden">
+    <div class="ench-window">
+      <div class="guide-head">
+        <span class="gh-title">✨ Table d'enchantement</span>
+        <span class="gh-hint">Outil sélectionné · coût en 💎 · Échap pour fermer</span>
+      </div>
+      <div id="ench-tool"></div>
+      <div id="ench-list"></div>
     </div>
   </div>
 

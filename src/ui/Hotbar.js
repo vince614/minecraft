@@ -1,5 +1,14 @@
 import { HOTBAR_SIZE } from '../inventory/Inventory.js';
-import { itemColor, itemName } from '../blocks/BlockRegistry.js';
+import { itemName, maxDurabilityOf } from '../blocks/BlockRegistry.js';
+import { iconStyle } from '../blocks/icons.js';
+
+// Barre de durabilité (verte→rouge) si l'objet est un outil usé.
+export function durBarHtml(stack) {
+  if (!stack || stack.dur == null) return '';
+  const frac = Math.max(0, stack.dur / maxDurabilityOf(stack.id));
+  const hue = Math.round(frac * 110); // rouge (0) -> vert (110)
+  return `<span class="durbar"><span style="width:${frac * 100}%;background:hsl(${hue},80%,45%)"></span></span>`;
+}
 
 // Barre d'inventaire : affiche les 9 premiers slots de l'inventaire (id +
 // quantité) et la sélection courante. La sélection est stockée dans
@@ -40,9 +49,10 @@ export class Hotbar {
       el.innerHTML = `<span class="key">${i + 1}</span>`;
       if (stack) {
         el.innerHTML +=
-          `<span class="swatch" style="background:${itemColor(stack.id)}"></span>` +
+          `<span class="swatch" style="${iconStyle(stack.id)}"></span>` +
           `<span class="count">${stack.count > 1 ? stack.count : ''}</span>` +
-          `<span class="name">${itemName(stack.id)}</span>`;
+          `<span class="name">${itemName(stack.id)}</span>` +
+          durBarHtml(stack);
       }
     }
   }

@@ -26,17 +26,23 @@ export class Player {
     this.pitch = 0;
 
     this.flying = false;
+    this.creative = false; // mode créatif : vol, blocs infinis, pas de dégâts
     this.onGround = false;
     this.inWater = false;
     this.moving = false;            // intention de déplacement (pour les anims)
     this.cameraMode = 'first';      // 'first' | 'third'
     this.mouseSensitivity = BASE_SENS;
+    this.invertY = false;
 
     // Vie / dégâts de chute.
     this.spawn = spawn.clone();
     this.maxHealth = 20;
     this.health = 20;
+    this.maxHunger = 20;
+    this.hunger = 20;
     this.justDamaged = 0;           // quantité de dégâts subis cette frame (UI)
+    this._hungerTimer = 0;
+    this._starveTimer = 0;
 
     this._prevFly = false;
     this._airPeakY = spawn.y;       // point le plus haut atteint en l'air
@@ -63,8 +69,16 @@ export class Player {
     this.position.copy(this.spawn);
     this.velocity.set(0, 0, 0);
     this.health = this.maxHealth;
+    this.hunger = this.maxHunger;
     this._airPeakY = this.spawn.y;
     this.syncCamera();
+  }
+
+  // Manger : restaure de la faim.
+  eat(value) {
+    if (this.hunger >= this.maxHunger) return false;
+    this.hunger = Math.min(this.maxHunger, this.hunger + value);
+    return true;
   }
 
   setSensitivity(mult) {
@@ -108,6 +122,15 @@ export class Player {
 
   // Dégâts de chute (selon la distance) + régénération lente.
   _updateFallAndRegen(dt) {
+    // Créatif : invulnérable, jamais affamé.
+    if (this.creative) {
+      this.health = this.maxHealth;
+      this.hunger = this.maxHunger;
+      this._wasAir = !this.onGround;
+      this._airPeakY = this.position.y;
+      return;
+    }
+
     if (!this.onGround) {
       this._airPeakY = Math.max(this._airPeakY, this.position.y);
     } else {
@@ -119,9 +142,21 @@ export class Player {
     }
     this._wasAir = !this.onGround;
 
-    // Régénération : 1 PV toutes les 1.5 s après 5 s sans dégât.
+    // Faim : se vide avec le temps (plus vite en mouvement).
+    this._hungerTimer += dt * (this.moving ? 1.7 : 1);
+    if (this._hungerTimer > 8) {
+      this._hungerTimer = 0;
+      if (this.hunger > 0) this.hunger--;
+    }
+    // Famine : si la faim est vide, on perd des PV (sans descendre sous 1).
+    if (this.hunger <= 0 && this.health > 1) {
+      this._starveTimer += dt;
+      if (this._starveTimer > 4) { this._starveTimer = 0; this.damage(1); }
+    }
+
+    // Régénération : 1 PV toutes les 1.5 s après 5 s sans dégât, si bien nourri.
     this._regenTimer += dt;
-    if (this._regenTimer > 5 && this.health > 0 && this.health < this.maxHealth) {
+    if (this._regenTimer > 5 && this.hunger >= 18 && this.health > 0 && this.health < this.maxHealth) {
       this._regenAcc += dt;
       if (this._regenAcc >= 1.5) { this.health += 1; this._regenAcc = 0; }
     }
@@ -130,14 +165,15 @@ export class Player {
   handleLook(input) {
     const [dx, dy] = input.consumeMouse();
     this.yaw -= dx * this.mouseSensitivity;
-    this.pitch -= dy * this.mouseSensitivity;
+    this.pitch -= dy * this.mouseSensitivity * (this.invertY ? -1 : 1);
     if (this.pitch > MAX_PITCH) this.pitch = MAX_PITCH;
     if (this.pitch < -MAX_PITCH) this.pitch = -MAX_PITCH;
   }
 
   handleFlyToggle(input) {
     const f = input.isDown('KeyF');
-    if (f && !this._prevFly) {
+    // Le vol n'est disponible qu'en mode créatif.
+    if (f && !this._prevFly && this.creative) {
       this.flying = !this.flying;
       this.velocity.y = 0;
     }

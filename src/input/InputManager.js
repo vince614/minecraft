@@ -25,6 +25,7 @@ export class InputManager {
     this.pendingInventory = false; // touche E
     this.pendingCamera = false;    // touche F5
     this.pendingEscape = false;    // touche Échap
+    this.pendingGuide = false;     // touche C (guide de craft)
 
     this._bind();
   }
@@ -74,6 +75,7 @@ export class InputManager {
       // Événements ponctuels (on ignore l'auto-répétition).
       if (!e.repeat) {
         if (e.code === 'KeyE') this.pendingInventory = true;
+        if (e.code === 'KeyC') this.pendingGuide = true;
         if (e.code === 'F5') this.pendingCamera = true;
         if (e.code === 'Escape') this.pendingEscape = true;
       }
@@ -150,6 +152,12 @@ export class InputManager {
   consumeLeftClick() {
     const v = this.leftClicked;
     this.leftClicked = false;
+    return v;
+  }
+
+  consumeGuideToggle() {
+    const v = this.pendingGuide;
+    this.pendingGuide = false;
     return v;
   }
 }

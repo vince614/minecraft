@@ -167,4 +167,20 @@ export class SoundManager {
     this._tone(300, 0.25, { type: 'sawtooth', gain: 0.18, freqEnd: 90 });
     this._noise(0.18, { type: 'lowpass', freq: 800, gain: 0.2 });
   }
+
+  // Explosion : gros boum grave.
+  playExplosion() {
+    this._noise(0.6, { type: 'lowpass', freq: 400, gain: 0.6 });
+    this._tone(90, 0.5, { type: 'sawtooth', gain: 0.3, freqEnd: 30 });
+  }
+
+  // Tir d'arc.
+  playShoot() {
+    this._tone(900, 0.12, { type: 'triangle', gain: 0.12, freqEnd: 300 });
+  }
+
+  // Manger.
+  playEat() {
+    this._noise(0.1, { type: 'lowpass', freq: 500, gain: 0.2 });
+  }
 }

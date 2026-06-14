@@ -28,6 +28,13 @@ export class World {
     // et pour réappliquer les changements lorsqu'un chunk est régénéré.
     this.edits = new Map();
 
+    // Contenu des coffres (clé "wx,wy,wz" -> tableau de 27 slots).
+    this.chests = new Map();
+
+    // Multijoueur : callback(wx,wy,wz,id) appelé sur chaque modification locale.
+    this.onEdit = null;
+    this._suppressEdit = false; // true en appliquant une modif distante
+
     // Files de travail, traitées avec un budget par frame.
     this.dirty = new Set();   // chunks à (re)mailler (clés)
     this.toGenerate = [];     // [{cx,cz}] à générer, triés par distance
@@ -38,6 +45,21 @@ export class World {
 
   setRenderDistance(r) {
     this.renderDistance = r;
+  }
+
+  // Réinitialise complètement le monde sur une nouvelle seed (changement de
+  // monde) : décharge tous les chunks et repart sur un terrain neuf.
+  reset(seed) {
+    for (const c of this.chunks.values()) {
+      if (c.mesh) { this.scene.remove(c.mesh); c.mesh.geometry.dispose(); }
+      if (c.waterMesh) { this.scene.remove(c.waterMesh); c.waterMesh.geometry.dispose(); }
+    }
+    this.chunks.clear();
+    this.dirty.clear();
+    this.toGenerate = [];
+    this.edits.clear();
+    this.chests.clear();
+    this.generator = new TerrainGenerator(seed);
   }
 
   getChunk(cx, cz) {
@@ -73,6 +95,9 @@ export class World {
     // Mémorise la modification (sauvegarde / régénération).
     this.edits.set(`${wx},${wy},${wz}`, id);
 
+    // Diffusion multijoueur (sauf si on applique une modif reçue du réseau).
+    if (this.onEdit && !this._suppressEdit) this.onEdit(wx, wy, wz, id);
+
     this.markDirty(cx, cz);
     // Si le bloc touche un bord, le chunk voisin doit aussi recalculer ses
     // faces de couture.
@@ -85,6 +110,22 @@ export class World {
   markDirty(cx, cz) {
     const k = key(cx, cz);
     if (this.chunks.has(k)) this.dirty.add(k);
+  }
+
+  // Contenu d'un coffre (créé vide à la demande).
+  getChest(wx, wy, wz) {
+    const k = `${wx},${wy},${wz}`;
+    let slots = this.chests.get(k);
+    if (!slots) { slots = new Array(27).fill(null); this.chests.set(k, slots); }
+    return slots;
+  }
+
+  // Retire un coffre et renvoie son contenu (pour le butin à la casse).
+  removeChest(wx, wy, wz) {
+    const k = `${wx},${wy},${wz}`;
+    const slots = this.chests.get(k) || [];
+    this.chests.delete(k);
+    return slots;
   }
 
   // --- Boucle de mise à jour ----------------------------------------------
